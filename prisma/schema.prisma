@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LogisticType {
+  TRACKING
+  PICKING
+}
+
+enum LogisticState {
+  DRAFT
+  CHECK_PENDING
+  CHECK_IN_PROGRESS
+  CHECK_FINALIZED
+  READY
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  DELETED
+  DUPLICATED
+  STATE_CHANGED
+  CHECK_VERIFIED
+  CHECK_FINALIZED
+  MESSENGER_ASSIGNED
+  PRINTED
+  NOTIFICATION_SENT
+}
+
+model LogisticRecord {
+  id                String         @id @default(uuid())
+  tenantId          String
+  type              LogisticType
+  guideNumber       String
+  originType        String?
+  originId          String?
+  senderContactId   String
+  recipientContactId String
+  carrierId         String?
+  messengerId       String?
+  state             LogisticState  @default(DRAFT)
+  labels            String[]
+  extra             Json?
+  summary           Json?
+  fileUri           String?
+
+  parentRecordId    String?
+  parent            LogisticRecord? @relation("Children", fields: [parentRecordId], references: [id])
+  children          LogisticRecord[] @relation("Children")
+
+  items             LogisticItem[]
+  audit             AuditLog[]
+
+  createdBy         String?
+  updatedBy         String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  checkStartedAt     DateTime?
+  checkFinalizedAt   DateTime?
+  checkFinalizedBy   String?
+
+  @@unique([tenantId, guideNumber])
+  @@index([tenantId, state])
+  @@index([tenantId, type])
+  @@index([messengerId])
+}
+
+model LogisticItem {
+  id           String          @id @default(uuid())
+  recordId     String
+  record       LogisticRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  originItemId String?
+  sku          String?
+  name         String?
+  qtyExpected  Int
+  qtyVerified  Int             @default(0)
+  selected     Boolean         @default(false)
+
+  @@index([recordId])
+}
+
+model AuditLog {
+  id        String         @id @default(uuid())
+  tenantId  String
+  recordId  String
+  record    LogisticRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  action    AuditAction
+  payload   Json?
+  createdBy String?
+  createdAt DateTime       @default(now())
+
+  @@index([tenantId, recordId])
+}

@@ -1,0 +1,201 @@
+openapi: 3.0.0
+paths:
+  /api/v1/logistic/records:
+    post:
+      operationId: LogisticController_create_v1
+      parameters:
+        - name: type
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: originType
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: originId
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: &a1
+        - Logistic
+    get:
+      operationId: LogisticController_list_v1
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}:
+    get:
+      operationId: LogisticController_get_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      tags: *a1
+    patch:
+      operationId: LogisticController_update_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      tags: *a1
+    delete:
+      operationId: LogisticController_remove_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/check/verify:
+    post:
+      operationId: LogisticController_verifyItems_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/check/finalize:
+    post:
+      operationId: LogisticController_finalizeCheck_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/state:
+    post:
+      operationId: LogisticController_changeState_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/labels:
+    patch:
+      operationId: LogisticController_updateLabels_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/messenger/assign:
+    post:
+      operationId: LogisticController_assignMessenger_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/print:
+    post:
+      operationId: LogisticController_print_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/notify:
+    post:
+      operationId: LogisticController_notify_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/duplicate:
+    post:
+      operationId: LogisticController_duplicate_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+  /api/v1/logistic/records/{id}/split:
+    post:
+      operationId: LogisticController_split_v1
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a1
+info:
+  title: Logistics Microservice
+  description: ""
+  version: "1.0"
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas: {}

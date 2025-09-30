@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LogisticModule } from './logistic/logistic.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { HealthModule } from './health/health.module';
 import { LoggerModule } from 'nestjs-pino';
 
 @Module({
@@ -17,6 +18,7 @@ import { LoggerModule } from 'nestjs-pino';
     }),
     PrismaModule,
     LogisticModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

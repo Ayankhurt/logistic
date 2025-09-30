@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateGuideNumber } from '../common/auth/helpers/guide-number';
@@ -11,9 +12,19 @@ import { SocketsGateway } from '../sockets/sockets.gateway';
 import { TrazabilityService } from '../integrations/trazability/trazability.service';
 import { StorageService } from '../integrations/storage/storage.service';
 import { randomUUID } from 'crypto';
+import { LogisticRecord, LogisticType, SocketPayload } from './interfaces/logistic.interface';
+import { CreateLogisticRecordDto } from './dto/create-logistic-record.dto';
+import { UpdateLogisticRecordDto } from './dto/update-logistic-record.dto';
+import { QueryLogisticRecordsDto } from './dto/query-logistic-records.dto';
+import { VerifyItemDto } from './dto/verify-items.dto';
+import { ChangeStateDto } from './dto/change-state.dto';
+import { NotifyDto } from './dto/notify.dto';
+import { SplitDto } from './dto/split.dto';
 
 @Injectable()
 export class LogisticService {
+  private readonly logger = new Logger(LogisticService.name);
+
   constructor(
     private prisma: PrismaService,
     private contacts: ContactsService,
@@ -23,15 +34,15 @@ export class LogisticService {
     private storage: StorageService,
   ) {}
 
-  private async emit(event: string, record: any, changedBy?: string) {
-    const payload = {
+  private async emit(event: string, record: LogisticRecord, changedBy?: string) {
+    const payload: SocketPayload = {
       id: record.id,
       tenantId: record.tenantId,
       guideNumber: record.guideNumber,
       type: record.type,
       state: record.state,
       messengerId: record.messengerId ?? null,
-      etiquetas: record.labels,
+      etiquetas: record.labels.split(','),
       resumen: record.summary ?? null,
       changedBy,
       timestamp: new Date().toISOString(),
@@ -40,10 +51,10 @@ export class LogisticService {
   }
 
   async create(
-    dto: any,
-    type: 'TRACKING' | 'PICKING',
+    dto: CreateLogisticRecordDto,
+    type: LogisticType,
     origin?: { originType?: string; originId?: string },
-  ) {
+  ): Promise<LogisticRecord> {
     const tenantId = dto.tenantId;
     if (!tenantId) throw new BadRequestException('tenantId required');
     if (!dto.senderContactId || !dto.recipientContactId)
@@ -53,7 +64,7 @@ export class LogisticService {
       dto.senderContactId,
       dto.recipientContactId,
     ]);
-    if (dto.labels)
+    if (dto.labels?.length)
       await this.customFields.validateLabels(tenantId, dto.labels);
 
     const guide = generateGuideNumber(type, tenantId);
@@ -69,7 +80,7 @@ export class LogisticService {
           senderContactId: dto.senderContactId,
           recipientContactId: dto.recipientContactId,
           carrierId: dto.carrierId ?? null,
-          labels: dto.labels ?? [],
+          labels: dto.labels ? dto.labels.join(',') : '',
           extra: dto.extra ?? {},
           state: 'CHECK_PENDING',
           createdBy: dto.userId ?? null,
@@ -103,7 +114,7 @@ export class LogisticService {
           tenantId,
           recordId: record.id,
           action: 'CREATED',
-          payload: { type, origin, dto },
+          payload: { type, origin, dto: dto as any },
           createdBy: dto.userId ?? null,
         },
       });
@@ -117,14 +128,14 @@ export class LogisticService {
     return created;
   }
 
-  async list(q: any) {
+  async list(q: QueryLogisticRecordsDto): Promise<LogisticRecord[]> {
     const tenantId = q.tenantId;
     if (!tenantId) throw new BadRequestException('tenantId required');
     const where: any = { tenantId };
     if (q.type) where.type = q.type;
     if (q.state) where.state = q.state;
     if (q.messengerId) where.messengerId = q.messengerId;
-    if (q.labels?.length) where.labels = { hasEvery: q.labels };
+    if (q.labels?.length) where.labels = { contains: q.labels.join(',') };
     return this.prisma.logisticRecord.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -132,7 +143,7 @@ export class LogisticService {
     });
   }
 
-  async get(id: string) {
+  async get(id: string): Promise<LogisticRecord> {
     const rec = await this.prisma.logisticRecord.findUnique({
       where: { id },
       include: { items: true, children: true }, // comment this if schema has no children relation yet
@@ -141,10 +152,10 @@ export class LogisticService {
     return rec;
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateLogisticRecordDto): Promise<LogisticRecord> {
     const rec = await this.get(id);
     const allowed: any = {};
-    if (dto.labels)
+    if (dto.labels?.length)
       allowed.labels = await this.customFields.validateLabels(
         rec.tenantId,
         dto.labels,
@@ -190,8 +201,8 @@ export class LogisticService {
 
   async verifyItems(
     id: string,
-    items: { id: string; selected: boolean; qtyVerified?: number }[],
-  ) {
+    items: VerifyItemDto[],
+  ): Promise<{ ok: boolean }> {
     const rec = await this.get(id);
     if (!items?.length) throw new BadRequestException('No items provided');
 
@@ -219,7 +230,7 @@ export class LogisticService {
           tenantId: rec.tenantId,
           recordId: id,
           action: 'CHECK_VERIFIED',
-          payload: { items },
+          payload: { items: items as any },
         },
       });
     });
@@ -233,7 +244,7 @@ export class LogisticService {
     return { ok: true };
   }
 
-  async finalizeCheck(id: string, userId?: string) {
+  async finalizeCheck(id: string, userId?: string): Promise<LogisticRecord> {
     const rec = await this.get(id);
     const items = await this.prisma.logisticItem.findMany({
       where: { recordId: id, selected: true },
@@ -266,7 +277,7 @@ export class LogisticService {
     return updated;
   }
 
-  async changeState(id: string, state: string) {
+  async changeState(id: string, state: string): Promise<LogisticRecord> {
     const updated = await this.prisma.logisticRecord.update({
       where: { id },
       data: { state } as any,
@@ -289,18 +300,18 @@ export class LogisticService {
     return updated;
   }
 
-  async updateLabels(id: string, labels: string[]) {
+  async updateLabels(id: string, labels: string[]): Promise<LogisticRecord> {
     const rec = await this.get(id);
     const valid = await this.customFields.validateLabels(rec.tenantId, labels);
     const updated = await this.prisma.logisticRecord.update({
       where: { id },
-      data: { labels: valid },
+      data: { labels: valid.join(',') },
     });
     await this.emit('labels.updated', updated);
     return updated;
   }
 
-  async assignMessenger(id: string, messengerId: string) {
+  async assignMessenger(id: string, messengerId: string): Promise<LogisticRecord> {
     const updated = await this.prisma.logisticRecord.update({
       where: { id },
       data: { messengerId },
@@ -323,7 +334,7 @@ export class LogisticService {
     return updated;
   }
 
-  async printGuide(id: string) {
+  async printGuide(id: string): Promise<LogisticRecord> {
     const rec = await this.get(id);
     const pdfBuffer = Buffer.from(`PDF Guide ${rec.guideNumber}`);
     const fileUri = await this.storage.uploadPdf(
@@ -353,7 +364,7 @@ export class LogisticService {
     return updated;
   }
 
-  async notify(id: string, channels: string[]) {
+  async notify(id: string, channels: string[]): Promise<{ ok: boolean; link: string }> {
     const rec = await this.get(id);
     const link = `${process.env.PUBLIC_TRACK_BASE_URL}/${rec.tenantId}/${rec.guideNumber}`;
     await this.prisma.auditLog.create({
@@ -375,7 +386,7 @@ export class LogisticService {
     return { ok: true, link };
   }
 
-  async duplicate(id: string, copyExtra = false) {
+  async duplicate(id: string, copyExtra = false): Promise<LogisticRecord> {
     const rec = await this.get(id);
     const guide = generateGuideNumber(rec.type, rec.tenantId);
     const dup = await this.prisma.$transaction(async (tx) => {
@@ -431,18 +442,19 @@ export class LogisticService {
 
   async split(
     id: string,
-    splits: { items: { id: string; qty: number }[]; labels?: string[] }[],
-  ) {
+    splits: SplitDto[],
+  ): Promise<{ ok: boolean; children: LogisticRecord[] }> {
     const rec = await this.get(id);
     const allItems = await this.prisma.logisticItem.findMany({
       where: { recordId: id },
     });
-    const qtyById = new Map(allItems.map((i) => [i.id, i.qtyExpected]));
+    const qtyById = new Map<string, number>(allItems.map((i) => [i.id, i.qtyExpected]));
     for (const s of splits) {
       for (const it of s.items) {
         if (!qtyById.has(it.id))
           throw new BadRequestException(`Item ${it.id} not in record`);
-        if (it.qty <= 0 || it.qty > (qtyById.get(it.id) || 0))
+        const availableQty = qtyById.get(it.id) ?? 0;
+        if (it.qty <= 0 || it.qty > availableQty)
           throw new BadRequestException(`Invalid qty for ${it.id}`);
       }
     }
@@ -460,7 +472,7 @@ export class LogisticService {
             senderContactId: rec.senderContactId,
             recipientContactId: rec.recipientContactId,
             carrierId: rec.carrierId,
-            labels: s.labels ?? rec.labels,
+            labels: s.labels ? s.labels.join(',') : rec.labels,
             extra: {},
             state: 'CHECK_PENDING',
             parentRecordId: rec.id,

@@ -1,33 +1,136 @@
 version: "3.9"
+
 services:
+  # PostgreSQL Database
   db:
     image: postgres:15-alpine
+    container_name: logistics-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: logistic
+      POSTGRES_DB: logistics_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d logistic"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d logistics_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
+  # Logistics API Service
   api:
-    build: .
-    command: sh -c "pnpm prisma migrate deploy && node dist/main.js"
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: logistics-api
+    command: sh -c "pnpm prisma migrate deploy && pnpm run seed && node dist/main.js"
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgres://postgres:postgres@db:5432/logistic
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/logistics_db
       PORT: 3000
+      # External Services (mock URLs for development)
+      CONTACTS_BASE_URL: http://contacts-service:3001
+      CUSTOM_FIELDS_BASE_URL: http://custom-fields-service:3002
+      TRAZABILITY_BASE_URL: http://trazability-service:3003
+      STORAGE_BASE_URL: http://storage-service:3004
+      # CORS Configuration
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173
+      # Public URLs
+      PUBLIC_TRACK_BASE_URL: https://track.example.com
+      # Logging
+      LOG_LEVEL: info
     ports:
       - "3000:3000"
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: logistics-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: logistics-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: logistics-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: logistics-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
 
 volumes:
   dbdata:
+    driver: local
+  redisdata:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  default:
+    name: logistics-network

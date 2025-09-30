@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 enum LogisticType {
@@ -48,7 +48,7 @@ model LogisticRecord {
   carrierId         String?
   messengerId       String?
   state             LogisticState  @default(DRAFT)
-  labels            String[]
+  labels            String
   extra             Json?
   summary           Json?
   fileUri           String?

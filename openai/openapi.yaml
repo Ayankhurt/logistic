@@ -1,0 +1,361 @@
+openapi: 3.0.3
+info:
+  title: Logistic Service API
+  version: "1.0.0"
+  description: >
+    Microservice for **Trackings** and **Pickings** with integrations:
+    Custom Fields, Traceability, File Storage, Auth, Contacts Service, and Notifications.
+
+servers:
+  - url: http://localhost:3000/api/v1/logistic
+
+tags:
+  - name: Records
+  - name: Items
+  - name: Messenger
+  - name: Events
+  - name: Files
+  - name: Notifications
+  - name: Kanban
+  - name: Public Tracking
+
+paths:
+  /records:
+    post:
+      tags: [Records]
+      summary: Create a logistic record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogisticRecordCreate"
+      responses:
+        "201":
+          description: Record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogisticRecord"
+    get:
+      tags: [Records]
+      summary: List all logistic records
+      parameters:
+        - name: tenantId
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema: { type: string, enum: [TRACKING, PICKING] }
+        - name: state
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LogisticRecord" }
+
+  /records/{id}:
+    get:
+      tags: [Records]
+      summary: Get record by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Record found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogisticRecord" }
+    patch:
+      tags: [Records]
+      summary: Update logistic record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogisticRecordUpdate"
+      responses:
+        "200":
+          description: Record updated
+    delete:
+      tags: [Records]
+      summary: Delete logistic record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Record deleted
+
+  /records/{id}/items:
+    post:
+      tags: [Items]
+      summary: Add item to a record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LogisticItemCreate" }
+      responses:
+        "201":
+          description: Item created
+    get:
+      tags: [Items]
+      summary: List items for a record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of items
+
+  /records/{id}/items/{itemId}:
+    patch:
+      tags: [Items]
+      summary: Update an item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LogisticItemUpdate" }
+      responses:
+        "200":
+          description: Item updated
+    delete:
+      tags: [Items]
+      summary: Delete an item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Item deleted
+
+  /records/{id}/assign:
+    post:
+      tags: [Messenger]
+      summary: Assign messenger to record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messengerId:
+                  type: string
+      responses:
+        "200":
+          description: Messenger assigned
+
+  /records/{id}/events:
+    post:
+      tags: [Events]
+      summary: Add event for a record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventCreate" }
+      responses:
+        "201":
+          description: Event created
+    get:
+      tags: [Events]
+      summary: List events for a record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of events
+
+  /files/upload:
+    post:
+      tags: [Files]
+      summary: Upload a file
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: File uploaded
+
+  /files/{id}:
+    get:
+      tags: [Files]
+      summary: Get file metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: File info
+
+  /notifications/send:
+    post:
+      tags: [Notifications]
+      summary: Send notification via WhatsApp/SMS/Email
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotificationSend" }
+      responses:
+        "200":
+          description: Notification sent
+
+  /kanban/columns:
+    get:
+      tags: [Kanban]
+      summary: Get Kanban columns
+      responses:
+        "200":
+          description: Kanban columns
+
+  /records/{id}/tags:
+    post:
+      tags: [Kanban]
+      summary: Add tag to record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tag:
+                  type: string
+      responses:
+        "200":
+          description: Tag added
+
+  /public/track/{guideNumber}:
+    get:
+      tags: [Public Tracking]
+      summary: Public tracking info
+      parameters:
+        - name: guideNumber
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Public tracking details
+
+components:
+  schemas:
+    LogisticRecordCreate:
+      type: object
+      properties:
+        tenantId: { type: string }
+        type: { type: string, enum: [TRACKING, PICKING] }
+        senderContactId: { type: string }
+        recipientContactId: { type: string }
+        carrierId: { type: string }
+        labels:
+          type: array
+          items: { type: string }
+        extra: { type: object }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LogisticItemCreate" }
+        userId: { type: string }
+    LogisticRecordUpdate:
+      type: object
+      properties:
+        state: { type: string }
+        labels:
+          type: array
+          items: { type: string }
+    LogisticRecord:
+      allOf:
+        - $ref: "#/components/schemas/LogisticRecordCreate"
+        - type: object
+          properties:
+            id: { type: string }
+            guideNumber: { type: string }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    LogisticItemCreate:
+      type: object
+      properties:
+        originItemId: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        qtyExpected: { type: integer }
+    LogisticItemUpdate:
+      type: object
+      properties:
+        qtyVerified: { type: integer }
+
+    EventCreate:
+      type: object
+      properties:
+        type: { type: string }
+        changedBy: { type: string }
+
+    NotificationSend:
+      type: object
+      properties:
+        to: { type: string }
+        guideNumber: { type: string }
+        link: { type: string }

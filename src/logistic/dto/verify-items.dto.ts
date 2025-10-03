@@ -1,13 +1,21 @@
-import { IsString, IsBoolean, IsOptional, IsInt, Min, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsInt,
+  Min,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class VerifyItemDto {
-  @ApiProperty({ description: 'Item ID to verify' })
+  @ApiProperty({ description: 'Item ID' })
   @IsString()
   id: string;
 
-  @ApiProperty({ description: 'Whether the item is selected/verified' })
+  @ApiProperty({ description: 'Selected/Verified?' })
   @IsBoolean()
   selected: boolean;
 
@@ -24,4 +32,8 @@ export class VerifyItemsDto {
   @ValidateNested({ each: true })
   @Type(() => VerifyItemDto)
   items: VerifyItemDto[];
+
+  @ApiProperty({ description: 'User ID performing the action' })
+  @IsString()
+  userId: string;
 }

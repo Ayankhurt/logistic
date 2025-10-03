@@ -1,0 +1,152 @@
+{
+  "logistic": {
+    "createRecord": {
+      "tenantId": "tenant123",
+      "type": "TRACKING",
+      "senderContactId": "123e4567-e89b-12d3-a456-426614174000",
+      "recipientContactId": "123e4567-e89b-12d3-a456-426614174001",
+      "carrierId": "carrier123",
+      "labels": [
+        "fragile",
+        "urgent"
+      ],
+      "extra": {
+        "customField1": "value1"
+      },
+      "items": [
+        {
+          "originItemId": "item123",
+          "sku": "SKU123",
+          "name": "Item Name",
+          "qtyExpected": 10
+        }
+      ],
+      "userId": "user123"
+    },
+    "updateRecord": {
+      "labels": [
+        "updatedLabel"
+      ],
+      "extra": {
+        "customFieldUpdated": "newValue"
+      },
+      "carrierId": "carrier456",
+      "userId": "user456"
+    },
+    "changeState": {
+      "state": "READY",
+      "userId": "user123"
+    },
+    "assignMessenger": {
+      "messengerId": "messenger123",
+      "userId": "user123"
+    },
+    "verifyItems": {
+      "items": [
+        {
+          "id": "item123",
+          "qtyVerified": 5,
+          "selected": true
+        }
+      ],
+      "userId": "user123"
+    },
+    "finalizeCheck": {
+      "userId": "user123"
+    },
+    "duplicate": {
+      "copyExtraFields": true,
+      "userId": "user123"
+    },
+    "split": {
+      "items": [
+        {
+          "originItemId": "item123",
+          "qtyToSplit": 3
+        }
+      ],
+      "userId": "user123"
+    },
+    "updateLabels": {
+      "labels": [
+        "newLabel1",
+        "newLabel2"
+      ],
+      "userId": "user123"
+    },
+    "demo": {
+      "message": "Test demo message"
+    },
+    "deleteRecord": {
+      "userId": "user-123"
+    }
+  },
+  "kanban": {
+    "updateColumn": {
+      "recordId": "record123",
+      "newState": "IN_TRANSIT"
+    },
+    "updateTags": {
+      "recordId": "record123",
+      "labels": [
+        "tag1",
+        "tag2"
+      ]
+    }
+  },
+  "trazability": {
+    "create": {
+      "eventType": "DELIVERY",
+      "details": {
+        "location": "Warehouse 1",
+        "timestamp": "2024-06-01T12:00:00Z"
+      }
+    }
+  },
+  "check": {
+    "verifyItems": {
+      "items": [
+        {
+          "id": "item123",
+          "selected": true,
+          "qtyVerified": 5
+        }
+      ],
+      "userId": "user123"
+    },
+    "finalizeCheck": {
+      "userId": "user123"
+    }
+  },
+  "notify": {
+    "testSms": {
+      "to": "+1234567890",
+      "guideNumber": "GUIDE123",
+      "link": "http://tracking.link"
+    },
+    "testWhatsApp": {
+      "to": "+1234567890",
+      "guideNumber": "GUIDE123",
+      "link": "http://tracking.link"
+    }
+  },
+  "auth": {
+    "verify": {
+      "authorization": "Bearer your.jwt.token"
+    }
+  },
+  "contacts": {
+    "listContacts": {
+      "tenantId": "tenant123"
+    },
+    "validateContact": {
+      "id": "contact123",
+      "tenantId": "tenant123"
+    }
+  },
+  "files": {
+    "uploadFile": {
+      "file": "binary file data"
+    }
+  }
+}

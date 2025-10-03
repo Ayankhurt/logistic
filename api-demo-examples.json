@@ -1,0 +1,278 @@
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "module": "logistic",
+    "endpoint": "POST /logistic",
+    "description": "Create logistic record",
+    "body": {
+      "tenantId": "tenant123",
+      "type": "TRACKING",
+      "senderContactId": "123e4567-e89b-12d3-a456-426614174000",
+      "recipientContactId": "123e4567-e89b-12d3-a456-426614174001",
+      "carrierId": "carrier123",
+      "labels": ["fragile", "urgent"],
+      "extra": {
+        "customField1": "value1"
+      },
+      "items": [
+        {
+          "originItemId": "item123",
+          "sku": "SKU123",
+          "name": "Item Name",
+          "qtyExpected": 10
+        }
+      ],
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "module": "logistic",
+    "endpoint": "PUT /logistic/:id",
+    "description": "Update logistic record",
+    "body": {
+      "labels": ["updatedLabel"],
+      "extra": {
+        "customFieldUpdated": "newValue"
+      },
+      "carrierId": "carrier456",
+      "userId": "user456"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440002",
+    "module": "logistic",
+    "endpoint": "PATCH /logistic/:id/state",
+    "description": "Change logistic record state",
+    "body": {
+      "state": "READY",
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "module": "logistic",
+    "endpoint": "PATCH /logistic/:id/assign-messenger",
+    "description": "Assign messenger to record",
+    "body": {
+      "messengerId": "messenger123",
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440004",
+    "module": "logistic",
+    "endpoint": "POST /logistic/:id/verify-items",
+    "description": "Verify items in record",
+    "body": {
+      "items": [
+        {
+          "id": "item123",
+          "qtyVerified": 5,
+          "selected": true
+        }
+      ],
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440005",
+    "module": "logistic",
+    "endpoint": "POST /logistic/:id/finalize-check",
+    "description": "Finalize check process",
+    "body": {
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440006",
+    "module": "logistic",
+    "endpoint": "POST /logistic/:id/duplicate",
+    "description": "Duplicate logistic record",
+    "body": {
+      "copyExtraFields": true,
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440007",
+    "module": "logistic",
+    "endpoint": "POST /logistic/:id/split",
+    "description": "Split logistic record",
+    "body": {
+      "items": [
+        {
+          "originItemId": "item123",
+          "qtyToSplit": 3
+        }
+      ],
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440008",
+    "module": "logistic",
+    "endpoint": "PATCH /logistic/:id/labels",
+    "description": "Update labels on record",
+    "body": {
+      "labels": ["newLabel1", "newLabel2"],
+      "userId": "user123"
+    }
+  },
+
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "module": "logistic",
+    "endpoint": "DELETE /logistic/:id",
+    "description": "Delete logistic record",
+    "body": {
+      "userId": "user-123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440011",
+    "module": "kanban",
+    "endpoint": "PATCH /kanban/columns",
+    "description": "Update kanban columns",
+    "body": {
+      "recordId": "record123",
+      "newState": "IN_TRANSIT"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440012",
+    "module": "kanban",
+    "endpoint": "PATCH /kanban/tags",
+    "description": "Update kanban tags",
+    "body": {
+      "recordId": "record123",
+      "labels": ["tag1", "tag2"]
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440013",
+    "module": "trazability",
+    "endpoint": "POST /trazability",
+    "description": "Create trazability event",
+    "body": {
+      "eventType": "DELIVERY",
+      "details": {
+        "location": "Warehouse 1",
+        "timestamp": "2024-06-01T12:00:00Z"
+      }
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440014",
+    "module": "check",
+    "endpoint": "POST /check/:id/verify-items",
+    "description": "Verify items in check",
+    "body": {
+      "items": [
+        {
+          "id": "item123",
+          "selected": true,
+          "qtyVerified": 5
+        }
+      ],
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440015",
+    "module": "check",
+    "endpoint": "POST /check/:id/finalize-check",
+    "description": "Finalize check",
+    "body": {
+      "userId": "user123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440018",
+    "module": "auth",
+    "endpoint": "POST /auth/verify-token",
+    "description": "Verify authentication token",
+    "body": {
+      "authorization": "Bearer your.jwt.token"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440019",
+    "module": "contacts",
+    "endpoint": "GET /contacts",
+    "description": "List contacts",
+    "query": {
+      "tenantId": "tenant123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440020",
+    "module": "contacts",
+    "endpoint": "POST /contacts/validate",
+    "description": "Validate contact",
+    "body": {
+      "id": "contact123",
+      "tenantId": "tenant123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440021",
+    "module": "files",
+    "endpoint": "POST /files/upload",
+    "description": "Upload file",
+    "body": {
+      "file": "binary file data"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440022",
+    "module": "files",
+    "endpoint": "GET /files",
+    "description": "Get files list",
+    "query": {
+      "tenantId": "tenant123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440023",
+    "module": "audit",
+    "endpoint": "GET /audit",
+    "description": "Get audit logs",
+    "query": {
+      "page": 1,
+      "limit": 10
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440024",
+    "module": "printing",
+    "endpoint": "POST /printing/guide",
+    "description": "Print guide",
+    "body": {
+      "recordId": "record123",
+      "tenantId": "tenant123"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440025",
+    "module": "custom-fields",
+    "endpoint": "GET /custom-fields",
+    "description": "Get custom fields",
+    "query": {
+      "tenantId": "tenant123",
+      "recordType": "TRACKING"
+    }
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440026",
+    "module": "custom-fields",
+    "endpoint": "POST /custom-fields/validate",
+    "description": "Validate custom fields",
+    "body": {
+      "fields": {
+        "customField1": "value1"
+      },
+      "tenantId": "tenant123"
+    }
+  }
+]

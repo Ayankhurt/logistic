@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum LogisticType {
@@ -17,6 +17,7 @@ enum LogisticState {
   CHECK_PENDING
   CHECK_IN_PROGRESS
   CHECK_FINALIZED
+  ASSIGNED
   READY
   IN_TRANSIT
   DELIVERED
@@ -34,6 +35,8 @@ enum AuditAction {
   MESSENGER_ASSIGNED
   PRINTED
   NOTIFICATION_SENT
+  SPLIT
+  CREATED_FROM_SPLIT
 }
 
 model LogisticRecord {
@@ -48,7 +51,7 @@ model LogisticRecord {
   carrierId         String?
   messengerId       String?
   state             LogisticState  @default(DRAFT)
-  labels            String
+  labels            Json?
   extra             Json?
   summary           Json?
   fileUri           String?
@@ -73,6 +76,9 @@ model LogisticRecord {
   @@index([tenantId, state])
   @@index([tenantId, type])
   @@index([messengerId])
+  @@index([labels(ops: jsonb_ops)])
+  @@index([extra(ops: jsonb_ops)])
+  @@index([summary(ops: jsonb_ops)])
 }
 
 model LogisticItem {

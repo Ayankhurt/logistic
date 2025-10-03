@@ -1,509 +1,873 @@
+// src/logistic/logistic.service.ts
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
   Logger,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { generateGuideNumber } from '../common/auth/helpers/guide-number';
-import { ContactsService } from '../integrations/contacts/contacts.service';
-import { CustomFieldsService } from '../integrations/custom-fields/custom-fields.service';
-import { SocketsGateway } from '../sockets/sockets.gateway';
-import { TrazabilityService } from '../integrations/trazability/trazability.service';
-import { StorageService } from '../integrations/storage/storage.service';
-import { randomUUID } from 'crypto';
-import { LogisticRecord, LogisticType, SocketPayload } from './interfaces/logistic.interface';
+import { randomUUID } from 'node:crypto';
+import { LogisticRecord } from './interfaces/logistic.interface';
+import { SocketsService } from '../sockets/sockets.gateway';
 import { CreateLogisticRecordDto } from './dto/create-logistic-record.dto';
+import { UpdateLabelsDto } from './dto/update-labels.dto';
 import { UpdateLogisticRecordDto } from './dto/update-logistic-record.dto';
-import { QueryLogisticRecordsDto } from './dto/query-logistic-records.dto';
-import { VerifyItemDto } from './dto/verify-items.dto';
 import { ChangeStateDto } from './dto/change-state.dto';
-import { NotifyDto } from './dto/notify.dto';
-import { SplitDto } from './dto/split.dto';
+import { QueryLogisticRecordsDto } from './dto/query-logistic-records.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { CheckItemsDto } from './dto/check-items.dto';
+import { FinalizeCheckDto } from './dto/finalize-check.dto';
+import { SplitLogisticRecordDto } from './dto/split-records.dto';
+import { LogisticState } from '../common/state/logistic-state.enum';
+import { ContactsService } from '../integrations/contacts/contacts.service';
+import { PrintingService } from '../printing/printing.service';
+import { NotifyService } from '../notify/notify.service';
+import { TrazabilityService } from '../integrations/trazability/trazability.service';
 
 @Injectable()
 export class LogisticService {
   private readonly logger = new Logger(LogisticService.name);
-
   constructor(
-    private prisma: PrismaService,
-    private contacts: ContactsService,
-    private customFields: CustomFieldsService,
-    private sockets: SocketsGateway,
-    private traz: TrazabilityService,
-    private storage: StorageService,
+    private readonly socketsService: SocketsService,
+    private readonly prisma: PrismaService,
+    private readonly contactsService: ContactsService,
+    private readonly printingService: PrintingService,
+    private readonly notifyService: NotifyService,
+    private readonly trazabilityService: TrazabilityService,
   ) {}
 
-  private async emit(event: string, record: LogisticRecord, changedBy?: string) {
-    const payload: SocketPayload = {
+  // --- CREATE RECORD ---
+  async createRecord(dto: CreateLogisticRecordDto): Promise<LogisticRecord> {
+    try {
+      // Validate sender and recipient contacts
+      const senderValid = await this.contactsService.validateContact(dto.senderContactId, dto.tenantId);
+      if (!senderValid) {
+        throw new BadRequestException(`Invalid sender contact ID: ${dto.senderContactId}`);
+      }
+      const recipientValid = await this.contactsService.validateContact(dto.recipientContactId, dto.tenantId);
+      if (!recipientValid) {
+        throw new BadRequestException(`Invalid recipient contact ID: ${dto.recipientContactId}`);
+      }
+
+      const guideNumber = `G-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      const record = await this.prisma.logisticRecord.create({
+        data: {
+          id: randomUUID(),
+          tenantId: dto.tenantId,
+          type: dto.type,
+          guideNumber,
+          senderContactId: dto.senderContactId,
+          recipientContactId: dto.recipientContactId,
+          carrierId: dto.carrierId,
+          labels: (dto.labels ?? []).join(','),
+          extra: dto.extra,
+          createdBy: dto.userId,
+          items: {
+            create: dto.items?.map((i) => ({
+              id: randomUUID(),
+              originItemId: i.originItemId,
+              sku: i.sku,
+              name: i.name,
+              qtyExpected: i.qtyExpected,
+            })),
+          },
+        },
+        include: {
+          items: true,
+          audit: true,
+        },
+      });
+
+      // Create trazability event (failure stops operation)
+      try {
+        await this.trazabilityService.createEvent({
+          recordId: record.id,
+          eventType: 'CREATED',
+          payload: {
+            guideNumber: record.guideNumber,
+            type: record.type,
+            tenantId: record.tenantId,
+          },
+        });
+      } catch (trazabilityError) {
+        // If trazability fails, rollback the record creation
+        await this.prisma.logisticRecord.delete({ where: { id: record.id } });
+        throw new BadRequestException('Failed to create trazability event - operation rolled back');
+      }
+
+      // Emit socket event
+      this.socketsService.emitLogisticCreated({
+        id: record.id,
+        tenantId: record.tenantId,
+        guideNumber: record.guideNumber,
+        type: record.type,
+        state: record.state,
+        messengerId: record.messengerId || undefined,
+        etiquetas: record.labels,
+        resumen: record.summary,
+        changedBy: record.createdBy || 'system',
+        timestamp: record.createdAt.toISOString(),
+      });
+
+      return this.mapDbRecordToDomain(record);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Error creating record: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // --- GET RECORD ---
+  async getRecord(id: string, tenantId: string): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true, audit: true, children: true },
+    });
+    if (!record) throw new NotFoundException('Record not found');
+    if (record.tenantId !== tenantId)
+      throw new BadRequestException('Tenant mismatch');
+    return this.mapDbRecordToDomain(record);
+  }
+
+  // --- UPDATE RECORD ---
+  async updateRecord(
+    id: string,
+    dto: UpdateLogisticRecordDto,
+  ): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.update({
+      where: { id },
+      data: {
+        labels: dto.labels?.join(','),
+        extra: dto.extra as any,
+        carrierId: dto.carrierId,
+        updatedBy: dto.userId,
+      },
+      include: { items: true, audit: true, children: true },
+    });
+
+    this.socketsService.emitLogisticUpdated({
       id: record.id,
       tenantId: record.tenantId,
       guideNumber: record.guideNumber,
       type: record.type,
       state: record.state,
-      messengerId: record.messengerId ?? null,
-      etiquetas: record.labels.split(','),
-      resumen: record.summary ?? null,
-      changedBy,
-      timestamp: new Date().toISOString(),
-    };
-    this.sockets.emitEvent(`logistic.${event}`, payload);
+      messengerId: record.messengerId || undefined,
+      etiquetas: record.labels,
+      resumen: record.summary,
+      changedBy: record.updatedBy || 'system',
+      timestamp: record.updatedAt.toISOString(),
+    });
+    return this.mapDbRecordToDomain(record);
   }
 
-  async create(
-    dto: CreateLogisticRecordDto,
-    type: LogisticType,
-    origin?: { originType?: string; originId?: string },
-  ): Promise<LogisticRecord> {
-    const tenantId = dto.tenantId;
-    if (!tenantId) throw new BadRequestException('tenantId required');
-    if (!dto.senderContactId || !dto.recipientContactId)
-      throw new BadRequestException('Contacts required');
+  // --- CHANGE STATE ---
+  async changeState(id: string, dto: ChangeStateDto): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.update({
+      where: { id },
+      data: { state: dto.state as any },
+      include: { items: true, audit: true, children: true },
+    });
+    this.socketsService.emitLogisticStateChanged({
+      id: record.id,
+      tenantId: record.tenantId,
+      guideNumber: record.guideNumber,
+      type: record.type,
+      state: record.state,
+      messengerId: record.messengerId || undefined,
+      etiquetas: record.labels,
+      resumen: record.summary,
+      changedBy: dto.userId,
+      timestamp: new Date().toISOString(),
+    });
+    return this.mapDbRecordToDomain(record);
+  }
 
-    await this.contacts.validateContacts(tenantId, [
-      dto.senderContactId,
-      dto.recipientContactId,
-    ]);
-    if (dto.labels?.length)
-      await this.customFields.validateLabels(tenantId, dto.labels);
+  // --- LIST RECORDS ---
+  async listRecords(query: QueryLogisticRecordsDto): Promise<LogisticRecord[]> {
+    const where: any = {};
 
-    const guide = generateGuideNumber(type, tenantId);
-
-    const created = await this.prisma.$transaction(async (tx) => {
-      const record = await tx.logisticRecord.create({
-        data: {
-          tenantId,
-          type,
-          guideNumber: guide,
-          originType: origin?.originType,
-          originId: origin?.originId,
-          senderContactId: dto.senderContactId,
-          recipientContactId: dto.recipientContactId,
-          carrierId: dto.carrierId ?? null,
-          labels: dto.labels ? dto.labels.join(',') : '',
-          extra: dto.extra ?? {},
-          state: 'CHECK_PENDING',
-          createdBy: dto.userId ?? null,
-          items: {
-            create: (dto.items ?? []).map((i: any) => ({
-              originItemId: i.originItemId ?? null,
-              sku: i.sku ?? null,
-              name: i.name ?? null,
-              qtyExpected: i.qtyExpected ?? 1,
-            })),
-          },
-        },
-        include: { items: true },
-      });
-
-      const summary = {
-        sender: dto.senderContactId,
-        recipient: dto.recipientContactId,
-        carrier: dto.carrierId ?? null,
-        items: record.items.length,
+    if (query.tenantId) where.tenantId = query.tenantId;
+    if (query.type) where.type = query.type;
+    if (query.state) where.state = query.state;
+    if (query.messengerId) where.messengerId = query.messengerId;
+    if (query.labels && query.labels.length > 0) {
+      where.labels = {
+        contains: query.labels.join(','),
       };
+    }
+    if (query.guideNumber) where.guideNumber = query.guideNumber;
 
-      await tx.logisticRecord.update({
-        where: { id: record.id },
-        data: { summary },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          id: randomUUID(),
-          tenantId,
-          recordId: record.id,
-          action: 'CREATED',
-          payload: { type, origin, dto: dto as any },
-          createdBy: dto.userId ?? null,
-        },
-      });
-
-      return { ...record, summary };
+    const records = await this.prisma.logisticRecord.findMany({
+      where,
+      include: { items: true, audit: true, children: true },
+      orderBy: { createdAt: 'desc' },
     });
 
-    await this.traz.emitBaseEvent('CREATED', { id: created.id, tenantId });
-    await this.emit('created', created, dto.userId);
-    await this.emit('updated', created, dto.userId);
-    return created;
+    return records.map((record) => this.mapDbRecordToDomain(record));
   }
 
-  async list(q: QueryLogisticRecordsDto): Promise<LogisticRecord[]> {
-    const tenantId = q.tenantId;
-    if (!tenantId) throw new BadRequestException('tenantId required');
-    const where: any = { tenantId };
-    if (q.type) where.type = q.type;
-    if (q.state) where.state = q.state;
-    if (q.messengerId) where.messengerId = q.messengerId;
-    if (q.labels?.length) where.labels = { contains: q.labels.join(',') };
-    return this.prisma.logisticRecord.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
+  // --- CHECK ITEMS ---
+  async checkItems(id: string, dto: CheckItemsDto): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.findUnique({
+      where: { id },
       include: { items: true },
     });
-  }
 
-  async get(id: string): Promise<LogisticRecord> {
-    const rec = await this.prisma.logisticRecord.findUnique({
-      where: { id },
-      include: { items: true, children: true }, // comment this if schema has no children relation yet
-    });
-    if (!rec) throw new NotFoundException('Not found');
-    return rec;
-  }
+    if (!record) throw new NotFoundException('Record not found');
 
-  async update(id: string, dto: UpdateLogisticRecordDto): Promise<LogisticRecord> {
-    const rec = await this.get(id);
-    const allowed: any = {};
-    if (dto.labels?.length)
-      allowed.labels = await this.customFields.validateLabels(
-        rec.tenantId,
-        dto.labels,
-      );
-    if (dto.extra) allowed.extra = dto.extra;
-    if (dto.carrierId !== undefined) allowed.carrierId = dto.carrierId;
+    // Set checkStartedAt if not already set
+    const checkStartedAt = record.checkStartedAt || new Date();
 
-    const updated = await this.prisma.logisticRecord.update({
-      where: { id },
-      data: allowed,
-    });
-    await this.prisma.auditLog.create({
-      data: {
-        id: randomUUID(),
-        tenantId: updated.tenantId,
-        recordId: id,
-        action: 'UPDATED',
-        payload: allowed,
-        createdBy: dto.userId ?? null,
-      },
-    });
-    await this.traz.emitBaseEvent('UPDATED', {
-      id,
-      tenantId: updated.tenantId,
-    });
-    await this.emit('updated', updated, dto.userId);
-    return updated;
-  }
-
-  async remove(id: string) {
-    const rec = await this.get(id);
-    await this.prisma.auditLog.create({
-      data: {
-        id: randomUUID(),
-        tenantId: rec.tenantId,
-        recordId: id,
-        action: 'DELETED',
-      },
-    });
-    await this.prisma.logisticRecord.delete({ where: { id } });
-    return { ok: true };
-  }
-
-  async verifyItems(
-    id: string,
-    items: VerifyItemDto[],
-  ): Promise<{ ok: boolean }> {
-    const rec = await this.get(id);
-    if (!items?.length) throw new BadRequestException('No items provided');
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const it of items) {
-        await tx.logisticItem.update({
-          where: { id: it.id },
-          data: {
-            selected: !!it.selected,
-            qtyVerified:
-              typeof it.qtyVerified === 'number' ? it.qtyVerified : undefined,
-          },
-        });
-      }
-      await tx.logisticRecord.update({
+    // Update record with checkStartedAt if needed
+    if (!record.checkStartedAt) {
+      await this.prisma.logisticRecord.update({
         where: { id },
+        data: { checkStartedAt },
+      });
+    }
+
+    // Update each item with verified quantity
+    for (const checkItem of dto.items) {
+      await this.prisma.logisticItem.update({
+        where: { id: checkItem.id },
         data: {
-          state: 'CHECK_IN_PROGRESS',
-          checkStartedAt: rec.checkStartedAt ?? new Date(),
+          qtyVerified: checkItem.qtyVerified,
+          selected: checkItem.selected,
         },
       });
-      await tx.auditLog.create({
-        data: {
-          id: randomUUID(),
-          tenantId: rec.tenantId,
-          recordId: id,
-          action: 'CHECK_VERIFIED',
-          payload: { items: items as any },
-        },
-      });
-    });
+    }
 
-    const after = await this.get(id);
-    await this.traz.emitBaseEvent('CHECK_VERIFIED', {
-      id,
-      tenantId: rec.tenantId,
-    });
-    await this.emit('check.updated', after);
-    return { ok: true };
-  }
-
-  async finalizeCheck(id: string, userId?: string): Promise<LogisticRecord> {
-    const rec = await this.get(id);
-    const items = await this.prisma.logisticItem.findMany({
-      where: { recordId: id, selected: true },
-    });
-    if (!items.length)
-      throw new BadRequestException('At least one item must be verified');
-
-    const updated = await this.prisma.logisticRecord.update({
+    // Get updated record
+    const updatedRecord = await this.prisma.logisticRecord.findUnique({
       where: { id },
-      data: {
-        state: 'CHECK_FINALIZED',
-        checkFinalizedAt: new Date(),
-        checkFinalizedBy: userId ?? null,
-      },
+      include: { items: true, audit: true, children: true },
     });
+
+    // Create audit entry
     await this.prisma.auditLog.create({
       data: {
         id: randomUUID(),
-        tenantId: rec.tenantId,
+        tenantId: record.tenantId,
+        recordId: id,
+        action: 'CHECK_VERIFIED',
+        payload: JSON.stringify(dto.items),
+        createdBy: dto.userId,
+      },
+    });
+
+    if (!updatedRecord) throw new NotFoundException('Record not found after update');
+
+    // Emit socket event
+    this.socketsService.emitLogisticCheckUpdated({
+      id: updatedRecord.id,
+      tenantId: updatedRecord.tenantId,
+      guideNumber: updatedRecord.guideNumber,
+      type: updatedRecord.type,
+      state: updatedRecord.state,
+      messengerId: updatedRecord.messengerId || undefined,
+      etiquetas: updatedRecord.labels,
+      resumen: updatedRecord.summary,
+      changedBy: dto.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    return this.mapDbRecordToDomain(updatedRecord);
+  }
+
+  // --- FINALIZE CHECK ---
+  async finalizeCheck(
+    id: string,
+    dto: FinalizeCheckDto,
+  ): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.update({
+      where: { id },
+      data: {
+        checkFinalizedAt: new Date(),
+        checkFinalizedBy: dto.userId,
+        state: LogisticState.CHECK_FINALIZED as any,
+      },
+      include: { items: true, audit: true, children: true },
+    });
+
+    // Create audit entry
+    await this.prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        tenantId: record.tenantId,
         recordId: id,
         action: 'CHECK_FINALIZED',
-        createdBy: userId ?? null,
+        createdBy: dto.userId,
       },
     });
-    await this.traz.emitBaseEvent('CHECK_FINALIZED', {
-      id,
-      tenantId: rec.tenantId,
+
+    // Emit socket event
+    this.socketsService.emitLogisticCheckFinalized({
+      id: record.id,
+      tenantId: record.tenantId,
+      guideNumber: record.guideNumber,
+      type: record.type,
+      state: record.state,
+      messengerId: record.messengerId || undefined,
+      etiquetas: record.labels,
+      resumen: record.summary,
+      changedBy: dto.userId,
+      timestamp: new Date().toISOString(),
     });
-    await this.emit('check.finalized', updated, userId);
-    return updated;
+
+    return this.mapDbRecordToDomain(record);
   }
 
-  async changeState(id: string, state: string): Promise<LogisticRecord> {
-    const updated = await this.prisma.logisticRecord.update({
+  // --- ASSIGN MESSENGER ---
+  async assignMessenger(
+    id: string,
+    messengerId: string,
+    userId: string,
+  ): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.update({
       where: { id },
-      data: { state } as any,
+      data: {
+        messengerId,
+        state: LogisticState.ASSIGNED as any,
+        updatedBy: userId,
+      },
+      include: { items: true, audit: true, children: true },
     });
+
+    // Create audit entry
     await this.prisma.auditLog.create({
       data: {
         id: randomUUID(),
-        tenantId: updated.tenantId,
-        recordId: id,
-        action: 'STATE_CHANGED',
-        payload: { state },
-      },
-    });
-    await this.traz.emitBaseEvent('STATE_CHANGED', {
-      id,
-      tenantId: updated.tenantId,
-      state,
-    });
-    await this.emit('state.changed', updated);
-    return updated;
-  }
-
-  async updateLabels(id: string, labels: string[]): Promise<LogisticRecord> {
-    const rec = await this.get(id);
-    const valid = await this.customFields.validateLabels(rec.tenantId, labels);
-    const updated = await this.prisma.logisticRecord.update({
-      where: { id },
-      data: { labels: valid.join(',') },
-    });
-    await this.emit('labels.updated', updated);
-    return updated;
-  }
-
-  async assignMessenger(id: string, messengerId: string): Promise<LogisticRecord> {
-    const updated = await this.prisma.logisticRecord.update({
-      where: { id },
-      data: { messengerId },
-    });
-    await this.prisma.auditLog.create({
-      data: {
-        id: randomUUID(),
-        tenantId: updated.tenantId,
+        tenantId: record.tenantId,
         recordId: id,
         action: 'MESSENGER_ASSIGNED',
-        payload: { messengerId },
+        createdBy: userId,
+        payload: JSON.stringify({ messengerId }),
       },
     });
-    await this.traz.emitBaseEvent('MESSENGER_ASSIGNED', {
-      id,
-      tenantId: updated.tenantId,
-      messengerId,
+
+    // Emit socket event
+    this.socketsService.emitLogisticMessengerAssigned({
+      id: record.id,
+      tenantId: record.tenantId,
+      guideNumber: record.guideNumber,
+      type: record.type,
+      state: record.state,
+      messengerId: record.messengerId || undefined,
+      etiquetas: record.labels,
+      resumen: record.summary,
+      changedBy: userId,
+      timestamp: new Date().toISOString(),
     });
-    await this.emit('messenger.assigned', updated);
-    return updated;
+
+    return this.mapDbRecordToDomain(record);
   }
 
-  async printGuide(id: string): Promise<LogisticRecord> {
-    const rec = await this.get(id);
-    const pdfBuffer = Buffer.from(`PDF Guide ${rec.guideNumber}`);
-    const fileUri = await this.storage.uploadPdf(
-      rec.tenantId,
-      `guide-${rec.guideNumber}.pdf`,
-      pdfBuffer,
-    );
-    const updated = await this.prisma.logisticRecord.update({
+  // --- PRINT GUIDE ---
+  async printGuide(
+    id: string,
+    format: string,
+    userId: string,
+  ): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.findUnique({
       where: { id },
-      data: { fileUri },
+      include: { items: true, audit: true, children: true },
     });
+
+    if (!record) throw new NotFoundException('Record not found');
+
+    // Generate PDF using PrintingService
+    const fileUri = await this.printingService.generatePDF(id, record.tenantId);
+
+    if (!fileUri) {
+      throw new BadRequestException('Failed to generate print file');
+    }
+
+    // Update record with file URI
+    const updatedRecord = await this.prisma.logisticRecord.update({
+      where: { id },
+      data: {
+        fileUri,
+        updatedBy: userId,
+      },
+      include: { items: true, audit: true, children: true },
+    });
+
+    // Create audit entry
     await this.prisma.auditLog.create({
       data: {
         id: randomUUID(),
-        tenantId: rec.tenantId,
+        tenantId: record.tenantId,
         recordId: id,
         action: 'PRINTED',
-        payload: { fileUri },
+        createdBy: userId,
+        payload: JSON.stringify({ format }),
       },
     });
-    await this.traz.emitBaseEvent('PRINTED', {
-      id,
-      tenantId: rec.tenantId,
-      fileUri,
+
+    // Emit socket event
+    this.socketsService.emitLogisticPrinted({
+      id: updatedRecord.id,
+      tenantId: updatedRecord.tenantId,
+      guideNumber: updatedRecord.guideNumber,
+      type: updatedRecord.type,
+      state: updatedRecord.state,
+      messengerId: updatedRecord.messengerId || undefined,
+      etiquetas: updatedRecord.labels,
+      resumen: updatedRecord.summary,
+      changedBy: userId,
+      timestamp: new Date().toISOString(),
     });
-    await this.emit('printed', updated);
-    return updated;
+
+    return this.mapDbRecordToDomain(updatedRecord);
   }
 
-  async notify(id: string, channels: string[]): Promise<{ ok: boolean; link: string }> {
-    const rec = await this.get(id);
-    const link = `${process.env.PUBLIC_TRACK_BASE_URL}/${rec.tenantId}/${rec.guideNumber}`;
+  // --- SEND NOTIFICATION ---
+  async sendNotification(
+    id: string,
+    channel: string,
+    recipient: string,
+    userId: string,
+  ): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true, audit: true, children: true },
+    });
+
+    if (!record) throw new NotFoundException('Record not found');
+
+    // Send notification using NotifyService
+    if (channel.toLowerCase() === 'sms') {
+      await this.notifyService.sendTrackingNotification(
+        recipient,
+        record.guideNumber,
+        `https://tracking.example.com/${record.guideNumber}`,
+      );
+    } else if (channel.toLowerCase() === 'whatsapp') {
+      await this.notifyService.sendWhatsAppTracking(
+        recipient,
+        record.guideNumber,
+        `https://tracking.example.com/${record.guideNumber}`,
+      );
+    } else {
+      throw new BadRequestException(`Unsupported notification channel: ${channel}`);
+    }
+
+    // Create audit entry
     await this.prisma.auditLog.create({
       data: {
         id: randomUUID(),
-        tenantId: rec.tenantId,
+        tenantId: record.tenantId,
         recordId: id,
         action: 'NOTIFICATION_SENT',
-        payload: { channels, link },
+        createdBy: userId,
+        payload: JSON.stringify({ channel, recipient }),
       },
     });
-    await this.traz.emitBaseEvent('NOTIFICATION_SENT', {
-      id,
-      tenantId: rec.tenantId,
-      channels,
-      link,
+
+    // Emit socket event
+    this.socketsService.emitLogisticNotificationSent({
+      id: record.id,
+      tenantId: record.tenantId,
+      guideNumber: record.guideNumber,
+      type: record.type,
+      state: record.state,
+      messengerId: record.messengerId || undefined,
+      etiquetas: record.labels,
+      resumen: record.summary,
+      changedBy: userId,
+      timestamp: new Date().toISOString(),
     });
-    await this.emit('notification.sent', rec);
-    return { ok: true, link };
+
+    return this.mapDbRecordToDomain(record);
   }
 
-  async duplicate(id: string, copyExtra = false): Promise<LogisticRecord> {
-    const rec = await this.get(id);
-    const guide = generateGuideNumber(rec.type, rec.tenantId);
-    const dup = await this.prisma.$transaction(async (tx) => {
-      const newRec = await tx.logisticRecord.create({
-        data: {
-          tenantId: rec.tenantId,
-          type: rec.type,
-          guideNumber: guide,
-          originType: rec.originType,
-          originId: rec.originId,
-          senderContactId: rec.senderContactId,
-          recipientContactId: rec.recipientContactId,
-          carrierId: rec.carrierId,
-          labels: rec.labels,
-          extra: copyExtra ? (rec.extra as any) : {},
-          state: 'CHECK_PENDING',
-          summary: rec.summary as any,
-        },
-      });
-      const its = await tx.logisticItem.findMany({
-        where: { recordId: rec.id },
-      });
-      if (its.length) {
-        await tx.logisticItem.createMany({
-          data: its.map((i) => ({
-            recordId: newRec.id,
-            originItemId: i.originItemId,
-            sku: i.sku,
-            name: i.name,
-            qtyExpected: i.qtyExpected,
-          })),
-        });
-      }
-      await tx.auditLog.create({
-        data: {
-          id: randomUUID(),
-          tenantId: rec.tenantId,
-          recordId: newRec.id,
-          action: 'DUPLICATED',
-          payload: { from: rec.id },
-        },
-      });
-      return newRec;
-    });
-    await this.traz.emitBaseEvent('DUPLICATED', {
-      fromId: rec.id,
-      id: dup.id,
-      tenantId: rec.tenantId,
-    });
-    await this.emit('duplicated', dup);
-    return dup;
-  }
-
-  async split(
+  // --- DUPLICATE RECORD ---
+  async duplicateRecord(
     id: string,
-    splits: SplitDto[],
-  ): Promise<{ ok: boolean; children: LogisticRecord[] }> {
-    const rec = await this.get(id);
-    const allItems = await this.prisma.logisticItem.findMany({
-      where: { recordId: id },
+    copyExtraFields: boolean,
+    userId: string,
+  ): Promise<LogisticRecord> {
+    const originalRecord = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true },
     });
-    const qtyById = new Map<string, number>(allItems.map((i) => [i.id, i.qtyExpected]));
-    for (const s of splits) {
-      for (const it of s.items) {
-        if (!qtyById.has(it.id))
-          throw new BadRequestException(`Item ${it.id} not in record`);
-        const availableQty = qtyById.get(it.id) ?? 0;
-        if (it.qty <= 0 || it.qty > availableQty)
-          throw new BadRequestException(`Invalid qty for ${it.id}`);
-      }
-    }
-    const createdChildren = await this.prisma.$transaction(async (tx) => {
-      const children: any[] = [];
-      for (const s of splits) {
-        const guide = generateGuideNumber(rec.type, rec.tenantId);
-        const child = await tx.logisticRecord.create({
-          data: {
-            tenantId: rec.tenantId,
-            type: rec.type,
-            guideNumber: guide,
-            originType: rec.originType,
-            originId: rec.originId,
-            senderContactId: rec.senderContactId,
-            recipientContactId: rec.recipientContactId,
-            carrierId: rec.carrierId,
-            labels: s.labels ? s.labels.join(',') : rec.labels,
-            extra: {},
-            state: 'CHECK_PENDING',
-            parentRecordId: rec.id,
-          },
-        });
-        await tx.logisticItem.createMany({
-          data: s.items.map((it) => {
-            const base = allItems.find((ai) => ai.id === it.id)!;
+
+    if (!originalRecord) throw new NotFoundException('Record not found');
+
+    // Create new record with data from original
+    const newRecord = await this.prisma.logisticRecord.create({
+      data: {
+        id: randomUUID(),
+        tenantId: originalRecord.tenantId,
+        type: originalRecord.type,
+        guideNumber: `G-${Date.now()}`,
+        senderContactId: originalRecord.senderContactId,
+        recipientContactId: originalRecord.recipientContactId,
+        carrierId: originalRecord.carrierId,
+        labels: originalRecord.labels,
+        extra: copyExtraFields ? (originalRecord.extra as any) : null,
+        createdBy: userId,
+        items: {
+          create: originalRecord.items.map((item) => ({
+            id: randomUUID(),
+            originItemId: item.originItemId,
+            sku: item.sku,
+            name: item.name,
+            qtyExpected: item.qtyExpected,
+          })),
+        },
+      },
+      include: { items: true, audit: true },
+    });
+
+    // Create audit entry
+    await this.prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        tenantId: originalRecord.tenantId,
+        recordId: newRecord.id,
+        action: 'DUPLICATED',
+        createdBy: userId,
+        payload: JSON.stringify({ originalRecordId: id }),
+      },
+    });
+
+    // Emit socket event
+    this.socketsService.emitLogisticDuplicated({
+      id: newRecord.id,
+      tenantId: newRecord.tenantId,
+      guideNumber: newRecord.guideNumber,
+      type: newRecord.type,
+      state: newRecord.state,
+      messengerId: newRecord.messengerId || undefined,
+      etiquetas: newRecord.labels,
+      resumen: newRecord.summary,
+      changedBy: userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    return this.mapDbRecordToDomain(newRecord);
+  }
+
+  // --- SPLIT RECORD ---
+  async splitRecord(
+    id: string,
+    dto: SplitLogisticRecordDto,
+  ): Promise<LogisticRecord> {
+    const originalRecord = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!originalRecord) throw new NotFoundException('Record not found');
+
+    // Create new record as a child of the original
+    const newRecord = await this.prisma.logisticRecord.create({
+      data: {
+        id: randomUUID(),
+        tenantId: originalRecord.tenantId,
+        type: originalRecord.type,
+        guideNumber: `G-${Date.now()}-SPLIT`,
+        senderContactId: originalRecord.senderContactId,
+        recipientContactId: originalRecord.recipientContactId,
+        carrierId: originalRecord.carrierId,
+        labels: originalRecord.labels,
+        extra: originalRecord.extra as any,
+        parentRecordId: id,
+        createdBy: dto.userId,
+        items: {
+          create: dto.items.map((splitItem) => {
+            const originalItem = originalRecord.items.find(
+              (item) => item.id === splitItem.originItemId,
+            );
+
+            if (!originalItem) {
+              throw new BadRequestException(
+                `Item with ID ${splitItem.originItemId} not found in original record`,
+              );
+            }
+
+            if (splitItem.qtyToSplit > originalItem.qtyExpected) {
+              throw new BadRequestException(
+                `Cannot split more than available quantity for item ${splitItem.originItemId}`,
+              );
+            }
+
             return {
-              recordId: child.id,
-              originItemId: base.originItemId,
-              sku: base.sku,
-              name: base.name,
-              qtyExpected: it.qty,
+              id: randomUUID(),
+              originItemId: originalItem.originItemId,
+              sku: originalItem.sku,
+              name: originalItem.name,
+              qtyExpected: splitItem.qtyToSplit,
             };
           }),
-        });
-        children.push(child);
-      }
-      await tx.auditLog.create({
+        },
+      },
+      include: { items: true, audit: true },
+    });
+
+    // Update quantities in original record items
+    for (const splitItem of dto.items) {
+      const originalItem = originalRecord.items.find(
+        (item) => item.id === splitItem.originItemId,
+      );
+
+      await this.prisma.logisticItem.update({
+        where: { id: splitItem.originItemId },
         data: {
-          id: randomUUID(),
-          tenantId: rec.tenantId,
-          recordId: rec.id,
-          action: 'UPDATED',
-          payload: { splitInto: children.map((c) => c.id) },
+          qtyExpected: originalItem!.qtyExpected - splitItem.qtyToSplit,
         },
       });
-      return children;
+    }
+
+    // Create audit entries
+    await this.prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        tenantId: originalRecord.tenantId,
+        recordId: id,
+        action: 'SPLIT',
+        createdBy: dto.userId,
+        payload: JSON.stringify({ newRecordId: newRecord.id }),
+      },
     });
-    await this.emit('updated', rec);
-    return { ok: true, children: createdChildren };
+
+    await this.prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        tenantId: originalRecord.tenantId,
+        recordId: newRecord.id,
+        action: 'CREATED_FROM_SPLIT',
+        createdBy: dto.userId,
+        payload: JSON.stringify({ parentRecordId: id }),
+      },
+    });
+
+    // Emit socket events
+    const originalRecordData = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true, audit: true, children: true },
+    });
+
+    this.socketsService.emitLogisticUpdated({
+      id: originalRecordData!.id,
+      tenantId: originalRecordData!.tenantId,
+      guideNumber: originalRecordData!.guideNumber,
+      type: originalRecordData!.type,
+      state: originalRecordData!.state,
+      messengerId: originalRecordData!.messengerId || undefined,
+      etiquetas: originalRecordData!.labels,
+      resumen: originalRecordData!.summary,
+      changedBy: dto.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.socketsService.emitLogisticCreated({
+      id: newRecord.id,
+      tenantId: newRecord.tenantId,
+      guideNumber: newRecord.guideNumber,
+      type: newRecord.type,
+      state: newRecord.state,
+      messengerId: newRecord.messengerId || undefined,
+      etiquetas: newRecord.labels,
+      resumen: newRecord.summary,
+      changedBy: dto.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    return this.mapDbRecordToDomain(newRecord);
+  }
+
+  // --- DELETE RECORD ---
+  async deleteRecord(id: string, userId: string): Promise<void> {
+    const record = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!record) throw new NotFoundException('Record not found');
+
+    // Delete associated items first
+    await this.prisma.logisticItem.deleteMany({
+      where: { recordId: id },
+    });
+
+    // Delete audit logs
+    await this.prisma.auditLog.deleteMany({
+      where: { recordId: id },
+    });
+
+    // Delete the record
+    await this.prisma.logisticRecord.delete({
+      where: { id },
+    });
+
+    // Create audit entry for deletion (optional, since record is deleted)
+    // We can log this in a separate audit table if needed
+
+    // Emit socket event
+    this.socketsService.emitToTenant(
+      record.tenantId,
+      'logistic.record.deleted',
+      {
+        id,
+        tenantId: record.tenantId,
+        guideNumber: record.guideNumber,
+        type: record.type,
+        state: record.state,
+        messengerId: record.messengerId || undefined,
+        etiquetas: record.labels,
+        resumen: record.summary,
+        changedBy: userId,
+        timestamp: new Date().toISOString(),
+      },
+    );
+  }
+
+  // --- GET ASSIGNMENT ---
+  async getAssignment(id: string): Promise<any> {
+    const record = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      select: { messengerId: true, state: true },
+    });
+    if (!record) throw new NotFoundException('Record not found');
+    return record;
+  }
+
+  // --- ADD EVENT ---
+  async addEvent(id: string, eventDto: any): Promise<any> {
+    // Use trazability service to create event
+    const event = await this.trazabilityService.createEvent({
+      recordId: id,
+      eventType: eventDto.eventType,
+      payload: eventDto.payload,
+    });
+    return event;
+  }
+
+  // --- LIST EVENTS ---
+  async listEvents(id: string): Promise<any[]> {
+    // Get events from the audit log table
+    const events = await this.prisma.auditLog.findMany({
+      where: { recordId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return events.map(event => ({
+      id: event.id,
+      recordId: event.recordId,
+      action: event.action,
+      payload: event.payload,
+      createdBy: event.createdBy,
+      createdAt: event.createdAt,
+    }));
+  }
+
+  // --- ADD ITEM ---
+  async addItem(id: string, dto: any): Promise<any> {
+    const item = await this.prisma.logisticItem.create({
+      data: {
+        id: randomUUID(),
+        recordId: id,
+        originItemId: dto.originItemId,
+        sku: dto.sku,
+        name: dto.name,
+        qtyExpected: dto.qtyExpected,
+      },
+    });
+    return item;
+  }
+
+  // --- UPDATE ITEM ---
+  async updateItem(id: string, itemId: string, dto: any): Promise<any> {
+    const item = await this.prisma.logisticItem.update({
+      where: { id: itemId },
+      data: {
+        qtyVerified: dto.qtyVerified,
+        selected: dto.selected,
+      },
+    });
+    return item;
+  }
+
+  // --- DELETE ITEM ---
+  async deleteItem(id: string, itemId: string): Promise<void> {
+    await this.prisma.logisticItem.delete({
+      where: { id: itemId },
+    });
+  }
+
+  private mapDbRecordToDomain(db: any): LogisticRecord {
+    return {
+      ...db,
+      labels:
+        typeof db.labels === 'string' && db.labels.length > 0
+          ? db.labels.split(',')
+          : [],
+    } as LogisticRecord;
+  }
+
+  // --- ASSIGN TAGS ---
+  async assignTags(id: string, tags: string[]): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.findUnique({ where: { id } });
+    if (!record) throw new NotFoundException('Record not found');
+
+    const currentLabels = record.labels ? record.labels.split(',') : [];
+    const newLabels = [...new Set([...currentLabels, ...tags])];
+
+    const updatedRecord = await this.prisma.logisticRecord.update({
+      where: { id },
+      data: { labels: newLabels.join(',') },
+      include: { items: true, audit: true, children: true },
+    });
+
+    return this.mapDbRecordToDomain(updatedRecord);
+  }
+
+  // --- UPDATE LABELS ---
+  async updateLabels(id: string, dto: UpdateLabelsDto): Promise<LogisticRecord> {
+    const record = await this.prisma.logisticRecord.findUnique({
+      where: { id },
+      include: { items: true, audit: true, children: true },
+    });
+
+    if (!record) throw new NotFoundException('Record not found');
+
+    // Update labels
+    const updatedRecord = await this.prisma.logisticRecord.update({
+      where: { id },
+      data: {
+        labels: dto.labels.join(','),
+        updatedBy: dto.userId,
+      },
+      include: { items: true, audit: true, children: true },
+    });
+
+    // Create audit entry
+    await this.prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        tenantId: record.tenantId,
+        recordId: id,
+        action: 'STATE_CHANGED', // Using STATE_CHANGED for label updates
+        createdBy: dto.userId,
+        payload: JSON.stringify({ labels: dto.labels }),
+      },
+    });
+
+    // Emit socket event
+    this.socketsService.emitLogisticLabelsUpdated({
+      id: updatedRecord.id,
+      tenantId: updatedRecord.tenantId,
+      guideNumber: updatedRecord.guideNumber,
+      type: updatedRecord.type,
+      state: updatedRecord.state,
+      messengerId: updatedRecord.messengerId || undefined,
+      etiquetas: updatedRecord.labels,
+      resumen: updatedRecord.summary,
+      changedBy: dto.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    return this.mapDbRecordToDomain(updatedRecord);
   }
 }

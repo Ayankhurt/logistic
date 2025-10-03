@@ -1,33 +1,28 @@
-import { IsString, IsArray, IsOptional, IsObject, IsUUID, IsInt, Min, IsBoolean, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsUUID,
+  IsOptional,
+  IsArray,
+  IsObject,
+  ValidateNested,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export class CreateLogisticItemDto {
-  @ApiPropertyOptional({ description: 'Origin item ID from source document' })
-  @IsOptional()
-  @IsString()
-  originItemId?: string;
-
-  @ApiPropertyOptional({ description: 'SKU of the item' })
-  @IsOptional()
-  @IsString()
-  sku?: string;
-
-  @ApiPropertyOptional({ description: 'Name of the item' })
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @ApiProperty({ description: 'Expected quantity', minimum: 1 })
-  @IsInt()
-  @Min(1)
-  qtyExpected: number;
-}
+import { CreateLogisticItemDto } from './create-logistic-item.dto';
+import { LogisticType } from '@prisma/client';
 
 export class CreateLogisticRecordDto {
   @ApiProperty({ description: 'Tenant ID' })
   @IsString()
   tenantId: string;
+
+  @ApiProperty({
+    description: 'Type of logistic record',
+    enum: ['TRACKING', 'PICKING'],
+  })
+  @IsIn(['TRACKING', 'PICKING'])
+  type: LogisticType;
 
   @ApiProperty({ description: 'Sender contact ID' })
   @IsUUID()
@@ -42,7 +37,7 @@ export class CreateLogisticRecordDto {
   @IsString()
   carrierId?: string;
 
-  @ApiPropertyOptional({ description: 'Labels for categorization', type: [String] })
+  @ApiPropertyOptional({ description: 'Labels', type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -53,7 +48,7 @@ export class CreateLogisticRecordDto {
   @IsObject()
   extra?: Record<string, any>;
 
-  @ApiPropertyOptional({ description: 'Items in this record', type: [CreateLogisticItemDto] })
+  @ApiPropertyOptional({ description: 'Items', type: [CreateLogisticItemDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

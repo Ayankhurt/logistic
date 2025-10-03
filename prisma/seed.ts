@@ -3,91 +3,59 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
-
-  const tenantId = 'tenant-demo-1';
-
   // Create demo tracking record
-  const tracking = await prisma.logisticRecord.create({
+  const trackingRecord = await prisma.logisticRecord.create({
     data: {
-      id: 'tracking-001',
-      tenantId,
+      tenantId: 'demo-tenant',
       type: 'TRACKING',
-      guideNumber: 'TRK-2024-001',
-      originType: 'ORDER',
-      originId: 'order-123',
+      guideNumber: 'TRK-DEMO-001',
+      originType: 'order',
+      originId: 'order-001',
       senderContactId: 'contact-sender-001',
       recipientContactId: 'contact-recipient-001',
-      carrierId: 'carrier-fedex',
-      state: 'CHECK_FINALIZED',
-      labels: 'urgent,fragile',
+      carrierId: 'carrier-001',
+      state: 'DRAFT',
+      labels: 'urgent,express',
       extra: {
-        priority: 'high',
-        specialInstructions: 'Handle with care',
-        insuranceValue: 500.00
+        weight: 2.5,
+        dimensions: '30x20x10',
+        value: 150.00
       },
       summary: {
-        sender: 'contact-sender-001',
-        recipient: 'contact-recipient-001',
-        carrier: 'carrier-fedex',
-        items: 3
+        senderName: 'Demo Sender',
+        recipientName: 'Demo Recipient',
+        itemsCount: 3,
+        totalValue: 150.00
       },
-      createdBy: 'user-001',
-      checkStartedAt: new Date('2024-01-15T10:00:00Z'),
-      checkFinalizedAt: new Date('2024-01-15T10:30:00Z'),
-      checkFinalizedBy: 'user-001',
+      createdBy: 'demo-user',
+      updatedBy: 'demo-user',
       items: {
         create: [
           {
-            id: 'item-001',
-            originItemId: 'order-item-001',
+            originItemId: 'item-001',
             sku: 'SKU-001',
-            name: 'Laptop Computer',
-            qtyExpected: 1,
-            qtyVerified: 1,
-            selected: true
-          },
-          {
-            id: 'item-002',
-            originItemId: 'order-item-002',
-            sku: 'SKU-002',
-            name: 'Wireless Mouse',
+            name: 'Demo Product 1',
             qtyExpected: 2,
-            qtyVerified: 2,
-            selected: true
+            qtyVerified: 0,
+            selected: false
           },
           {
-            id: 'item-003',
-            originItemId: 'order-item-003',
-            sku: 'SKU-003',
-            name: 'USB Cable',
+            originItemId: 'item-002',
+            sku: 'SKU-002',
+            name: 'Demo Product 2',
             qtyExpected: 1,
-            qtyVerified: 1,
-            selected: true
+            qtyVerified: 0,
+            selected: false
           }
         ]
       },
       audit: {
         create: [
           {
-            id: 'audit-001',
-            tenantId,
+            tenantId: 'demo-tenant',
             action: 'CREATED',
-            payload: { type: 'TRACKING', origin: { originType: 'ORDER', originId: 'order-123' } },
-            createdBy: 'user-001'
-          },
-          {
-            id: 'audit-002',
-            tenantId,
-            action: 'CHECK_VERIFIED',
-            payload: { items: [{ id: 'item-001', selected: true, qtyVerified: 1 }] },
-            createdBy: 'user-001'
-          },
-          {
-            id: 'audit-003',
-            tenantId,
-            action: 'CHECK_FINALIZED',
-            createdBy: 'user-001'
+            payload: { guideNumber: 'TRK-DEMO-001' },
+            createdBy: 'demo-user'
           }
         ]
       }
@@ -95,120 +63,66 @@ async function main() {
   });
 
   // Create demo picking record
-  const picking = await prisma.logisticRecord.create({
+  const pickingRecord = await prisma.logisticRecord.create({
     data: {
-      id: 'picking-001',
-      tenantId,
+      tenantId: 'demo-tenant',
       type: 'PICKING',
-      guideNumber: 'PKG-2024-001',
-      originType: 'WAREHOUSE_ORDER',
-      originId: 'wo-456',
+      guideNumber: 'PCK-DEMO-001',
+      originType: 'order',
+      originId: 'order-002',
       senderContactId: 'contact-warehouse-001',
-      recipientContactId: 'contact-store-001',
-      carrierId: 'carrier-ups',
-      state: 'READY',
-      labels: 'bulk,warehouse',
+      recipientContactId: 'contact-customer-001',
+      state: 'DRAFT',
+      labels: 'priority,fragile',
       extra: {
-        warehouseZone: 'A-1',
-        pickingList: ['A1-B2-C3', 'A1-B2-C4'],
-        estimatedWeight: 15.5
+        location: 'Warehouse A',
+        pickingZone: 'Zone 1',
+        specialInstructions: 'Handle with care'
       },
       summary: {
-        sender: 'contact-warehouse-001',
-        recipient: 'contact-store-001',
-        carrier: 'carrier-ups',
-        items: 5
+        senderName: 'Demo Warehouse',
+        recipientName: 'Demo Customer',
+        itemsCount: 5,
+        priority: 'high'
       },
-      createdBy: 'user-002',
-      checkStartedAt: new Date('2024-01-15T14:00:00Z'),
-      checkFinalizedAt: new Date('2024-01-15T14:45:00Z'),
-      checkFinalizedBy: 'user-002',
+      createdBy: 'demo-user',
+      updatedBy: 'demo-user',
       items: {
         create: [
           {
-            id: 'item-004',
-            originItemId: 'wo-item-001',
-            sku: 'SKU-100',
-            name: 'T-Shirt (Red)',
-            qtyExpected: 10,
-            qtyVerified: 10,
-            selected: true
-          },
-          {
-            id: 'item-005',
-            originItemId: 'wo-item-002',
-            sku: 'SKU-101',
-            name: 'T-Shirt (Blue)',
-            qtyExpected: 8,
-            qtyVerified: 8,
-            selected: true
-          },
-          {
-            id: 'item-006',
-            originItemId: 'wo-item-003',
-            sku: 'SKU-102',
-            name: 'Jeans (32)',
-            qtyExpected: 5,
-            qtyVerified: 5,
-            selected: true
-          },
-          {
-            id: 'item-007',
-            originItemId: 'wo-item-004',
-            sku: 'SKU-103',
-            name: 'Sneakers (Size 9)',
+            originItemId: 'item-003',
+            sku: 'SKU-003',
+            name: 'Demo Product 3',
             qtyExpected: 3,
-            qtyVerified: 3,
-            selected: true
+            qtyVerified: 0,
+            selected: false
           },
           {
-            id: 'item-008',
-            originItemId: 'wo-item-005',
-            sku: 'SKU-104',
-            name: 'Backpack',
+            originItemId: 'item-004',
+            sku: 'SKU-004',
+            name: 'Demo Product 4',
             qtyExpected: 2,
-            qtyVerified: 2,
-            selected: true
+            qtyVerified: 0,
+            selected: false
           }
         ]
       },
       audit: {
         create: [
           {
-            id: 'audit-004',
-            tenantId,
+            tenantId: 'demo-tenant',
             action: 'CREATED',
-            payload: { type: 'PICKING', origin: { originType: 'WAREHOUSE_ORDER', originId: 'wo-456' } },
-            createdBy: 'user-002'
-          },
-          {
-            id: 'audit-005',
-            tenantId,
-            action: 'CHECK_VERIFIED',
-            payload: { items: [{ id: 'item-004', selected: true, qtyVerified: 10 }] },
-            createdBy: 'user-002'
-          },
-          {
-            id: 'audit-006',
-            tenantId,
-            action: 'CHECK_FINALIZED',
-            createdBy: 'user-002'
-          },
-          {
-            id: 'audit-007',
-            tenantId,
-            action: 'STATE_CHANGED',
-            payload: { state: 'READY' },
-            createdBy: 'user-002'
+            payload: { guideNumber: 'PCK-DEMO-001' },
+            createdBy: 'demo-user'
           }
         ]
       }
     }
   });
 
-  console.log('✅ Created tracking record:', tracking.guideNumber);
-  console.log('✅ Created picking record:', picking.guideNumber);
-  console.log('🎉 Database seeded successfully!');
+  console.log('Demo data created successfully!');
+  console.log('Tracking Record ID:', trackingRecord.id);
+  console.log('Picking Record ID:', pickingRecord.id);
 }
 
 main()
@@ -216,6 +130,6 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => {
-    void prisma.$disconnect();
+  .finally(async () => {
+    await prisma.$disconnect();
   });

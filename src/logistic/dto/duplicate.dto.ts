@@ -1,12 +1,16 @@
-import { IsOptional, IsBoolean } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsBoolean, IsString } from 'class-validator';
+import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 
 export class DuplicateDto {
-  @ApiPropertyOptional({ 
-    description: 'Whether to copy extra fields from the original record',
-    default: false
+  @ApiPropertyOptional({
+    description: 'Copy extra fields from original',
+    default: false,
   })
   @IsOptional()
   @IsBoolean()
-  copyExtra?: boolean = false;
+  copyExtraFields?: boolean = false;
+
+  @ApiProperty({ description: 'User ID performing the action' })
+  @IsString()
+  userId: string;
 }

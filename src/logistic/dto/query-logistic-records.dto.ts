@@ -1,7 +1,6 @@
 import { IsOptional, IsEnum, IsString, IsArray } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import type { LogisticType } from '../interfaces/logistic.interface';
-import { LogisticState } from './change-state.dto';
+import { LogisticState } from '../../common/state/logistic-state.enum';
 
 export class QueryLogisticRecordsDto {
   @ApiPropertyOptional({ description: 'Tenant ID' })
@@ -9,18 +8,12 @@ export class QueryLogisticRecordsDto {
   @IsString()
   tenantId?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Type of logistic record',
-    enum: ['TRACKING', 'PICKING']
-  })
+  @ApiPropertyOptional({ description: 'Type', enum: ['TRACKING', 'PICKING'] })
   @IsOptional()
   @IsEnum(['TRACKING', 'PICKING'])
-  type?: LogisticType;
+  type?: 'TRACKING' | 'PICKING';
 
-  @ApiPropertyOptional({ 
-    description: 'State of the logistic record',
-    enum: LogisticState
-  })
+  @ApiPropertyOptional({ description: 'State', enum: LogisticState })
   @IsOptional()
   @IsEnum(LogisticState)
   state?: LogisticState;
@@ -30,12 +23,14 @@ export class QueryLogisticRecordsDto {
   @IsString()
   messengerId?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Labels to filter by',
-    type: [String]
-  })
+  @ApiPropertyOptional({ description: 'Labels', type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   labels?: string[];
+
+  @ApiPropertyOptional({ description: 'Guide Number' })
+  @IsOptional()
+  @IsString()
+  guideNumber?: string;
 }

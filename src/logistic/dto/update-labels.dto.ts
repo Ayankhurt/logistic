@@ -2,12 +2,16 @@ import { IsArray, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateLabelsDto {
-  @ApiProperty({ 
-    description: 'Labels for categorization and filtering',
+  @ApiProperty({
+    description: 'Labels',
     type: [String],
-    example: ['urgent', 'fragile', 'express']
+    example: ['urgent', 'fragile'],
   })
   @IsArray()
   @IsString({ each: true })
   labels: string[];
+
+  @ApiProperty({ description: 'User ID performing the action' })
+  @IsString()
+  userId: string;
 }

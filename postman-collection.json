@@ -1,0 +1,422 @@
+{
+  "info": {
+    "name": "Logistic Service API Collection",
+    "description": "Complete API collection for Logistic Service with examples",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logistic Records CRUD",
+      "item": [
+        {
+          "name": "Create Tracking Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"tenant-123\",\n  \"type\": \"TRACKING\",\n  \"senderContactId\": \"contact-sender-001\",\n  \"recipientContactId\": \"contact-recipient-001\",\n  \"carrierId\": \"carrier-001\",\n  \"labels\": [\"urgent\", \"express\"],\n  \"extra\": {\n    \"weight\": 2.5,\n    \"dimensions\": \"30x20x10\",\n    \"value\": 150.00\n  },\n  \"userId\": \"user-123\",\n  \"items\": [\n    {\n      \"originItemId\": \"item-001\",\n      \"sku\": \"SKU-001\",\n      \"name\": \"Product 1\",\n      \"qtyExpected\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records",
+              "host": ["{{baseUrl}}"],
+              "path": ["records"]
+            }
+          }
+        },
+        {
+          "name": "Create Picking Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"tenant-123\",\n  \"type\": \"PICKING\",\n  \"senderContactId\": \"contact-warehouse-001\",\n  \"recipientContactId\": \"contact-customer-001\",\n  \"labels\": [\"priority\", \"fragile\"],\n  \"extra\": {\n    \"location\": \"Warehouse A\",\n    \"pickingZone\": \"Zone 1\"\n  },\n  \"userId\": \"user-123\",\n  \"items\": [\n    {\n      \"originItemId\": \"item-003\",\n      \"sku\": \"SKU-003\",\n      \"name\": \"Product 3\",\n      \"qtyExpected\": 3\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records",
+              "host": ["{{baseUrl}}"],
+              "path": ["records"]
+            }
+          }
+        },
+        {
+          "name": "List Records",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/records?tenantId=tenant-123&type=TRACKING&state=DRAFT",
+              "host": ["{{baseUrl}}"],
+              "path": ["records"],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "tenant-123"
+                },
+                {
+                  "key": "type",
+                  "value": "TRACKING"
+                },
+                {
+                  "key": "state",
+                  "value": "DRAFT"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Record by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here?tenantId=tenant-123",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here"],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "tenant-123"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Items Management",
+      "item": [
+        {
+          "name": "Add Items to Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originItemId\": \"item-002\",\n  \"sku\": \"SKU-002\",\n  \"name\": \"Product 2\",\n  \"qtyExpected\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/items",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "items"]
+            }
+          }
+        },
+        {
+          "name": "Update Item Verification",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qtyVerified\": 2,\n  \"selected\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/items/item-id-here",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "items", "item-id-here"]
+            }
+          }
+        },
+        {
+          "name": "Finalize Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/check/finalize",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "check", "finalize"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assignment & Events",
+      "item": [
+        {
+          "name": "Assign Messenger",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messengerId\": \"messenger-001\",\n  \"userId\": \"user-123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "assign"]
+            }
+          }
+        },
+        {
+          "name": "Get Assignment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/assignment",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "assignment"]
+            }
+          }
+        },
+        {
+          "name": "Get Record Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "events"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kanban & Labels",
+      "item": [
+        {
+          "name": "Get Kanban Columns",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/kanban/columns?tenantId=tenant-123",
+              "host": ["{{baseUrl}}"],
+              "path": ["kanban", "columns"],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "tenant-123"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Record Tags",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"labels\": [\"urgent\", \"completed\"],\n  \"userId\": \"user-123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/records/record-id-here/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["records", "record-id-here", "tags"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Operations",
+      "item": [
+        {
+          "name": "Upload File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["files", "upload"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Send Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer your-jwt-token-here"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channels\": [\"SMS\"],\n  \"recipient\": \"+1234567890\",\n  \"guideNumber\": \"TRK-DEMO-001\",\n  \"link\": \"https://tracking.example.com/TRK-DEMO-001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "send"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public Endpoints",
+      "item": [
+        {
+          "name": "Public Tracking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/public/track/TRK-DEMO-001",
+              "host": ["{{baseUrl}}"],
+              "path": ["public", "track", "TRK-DEMO-001"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1/logistic"
+    }
+  ]
+}

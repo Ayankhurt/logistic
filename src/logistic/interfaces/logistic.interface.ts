@@ -1,57 +1,8 @@
-export interface LogisticRecord {
-  id: string;
-  tenantId: string;
-  type: 'TRACKING' | 'PICKING';
-  guideNumber: string;
-  originType?: string | null;
-  originId?: string | null;
-  senderContactId: string;
-  recipientContactId: string;
-  carrierId?: string | null;
-  messengerId?: string | null;
-  state: LogisticState;
-  labels: string;
-  extra?: any;
-  summary?: any;
-  fileUri?: string | null;
-  parentRecordId?: string | null;
-  parent?: LogisticRecord;
-  children?: LogisticRecord[];
-  items?: LogisticItem[];
-  audit?: AuditLog[];
-  createdBy?: string | null;
-  updatedBy?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  checkStartedAt?: Date | null;
-  checkFinalizedAt?: Date | null;
-  checkFinalizedBy?: string | null;
-}
-
-export interface LogisticItem {
-  id: string;
-  recordId: string;
-  originItemId?: string | null;
-  sku?: string | null;
-  name?: string | null;
-  qtyExpected: number;
-  qtyVerified: number;
-  selected: boolean;
-}
-
-export interface AuditLog {
-  id: string;
-  tenantId: string;
-  recordId: string;
-  action: AuditAction;
-  payload?: Record<string, any>;
-  createdBy?: string;
-  createdAt: Date;
-}
+// src/logistic/interfaces/logistic.interface.ts
 
 export type LogisticType = 'TRACKING' | 'PICKING';
 
-export type LogisticState = 
+export type LogisticState =
   | 'DRAFT'
   | 'CHECK_PENDING'
   | 'CHECK_IN_PROGRESS'
@@ -61,27 +12,52 @@ export type LogisticState =
   | 'DELIVERED'
   | 'CANCELLED';
 
-export type AuditAction = 
-  | 'CREATED'
-  | 'UPDATED'
-  | 'DELETED'
-  | 'DUPLICATED'
-  | 'STATE_CHANGED'
-  | 'CHECK_VERIFIED'
-  | 'CHECK_FINALIZED'
-  | 'MESSENGER_ASSIGNED'
-  | 'PRINTED'
-  | 'NOTIFICATION_SENT';
+export interface LogisticItem {
+  id: string;
+  recordId: string;
+  originItemId?: string;
+  sku?: string;
+  name?: string;
+  qtyExpected: number;
+  qtyVerified: number;
+  selected: boolean;
+}
 
-export interface SocketPayload {
+export interface AuditLog {
   id: string;
   tenantId: string;
-  guideNumber: string;
+  recordId: string;
+  action: string;
+  payload?: Record<string, any>;
+  createdBy?: string;
+  createdAt: Date;
+}
+
+export interface LogisticRecord {
+  id: string;
+  tenantId: string;
   type: LogisticType;
+  guideNumber: string;
+  originType?: string;
+  originId?: string;
+  senderContactId: string;
+  recipientContactId: string;
+  carrierId?: string;
+  messengerId?: string;
   state: LogisticState;
-  messengerId?: string | null;
-  etiquetas: string[];
-  resumen?: Record<string, any> | null;
-  changedBy?: string;
-  timestamp: string;
+  labels: string[];
+  extra?: Record<string, any>;
+  summary?: Record<string, any>;
+  fileUri?: string;
+  parentRecordId?: string;
+  children?: LogisticRecord[];
+  items: LogisticItem[];
+  audit: AuditLog[];
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  checkStartedAt?: Date;
+  checkFinalizedAt?: Date;
+  checkFinalizedBy?: string;
 }

@@ -1,4 +1,4 @@
-import { IsArray, IsEnum } from 'class-validator';
+import { IsArray, IsEnum, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum NotificationChannel {
@@ -8,13 +8,30 @@ export enum NotificationChannel {
 }
 
 export class NotifyDto {
-  @ApiProperty({ 
-    description: 'Notification channels to use',
+  @ApiProperty({
+    description: 'Notification channels',
     enum: NotificationChannel,
     isArray: true,
-    example: [NotificationChannel.EMAIL, NotificationChannel.SMS]
   })
   @IsArray()
   @IsEnum(NotificationChannel, { each: true })
   channels: NotificationChannel[];
+
+  @ApiProperty({
+    description: 'Recipient contact information',
+  })
+  @IsString()
+  recipient: string;
+
+  @ApiProperty({
+    description: 'Guide number for tracking',
+  })
+  @IsString()
+  guideNumber: string;
+
+  @ApiProperty({
+    description: 'Tracking link',
+  })
+  @IsString()
+  link: string;
 }

@@ -1,14 +1,14 @@
-import { IsString, IsArray, IsOptional, IsObject } from 'class-validator';
+import { IsOptional, IsArray, IsString, IsObject } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateLogisticRecordDto {
-  @ApiPropertyOptional({ description: 'Labels for categorization', type: [String] })
+  @ApiPropertyOptional({ description: 'Labels', type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   labels?: string[];
 
-  @ApiPropertyOptional({ description: 'Extra fields data' })
+  @ApiPropertyOptional({ description: 'Extra fields' })
   @IsOptional()
   @IsObject()
   extra?: Record<string, any>;
@@ -18,7 +18,7 @@ export class UpdateLogisticRecordDto {
   @IsString()
   carrierId?: string;
 
-  @ApiPropertyOptional({ description: 'User ID who updated the record' })
+  @ApiPropertyOptional({ description: 'User ID' })
   @IsOptional()
   @IsString()
   userId?: string;

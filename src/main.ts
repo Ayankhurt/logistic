@@ -1,43 +1,78 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger } from 'nestjs-pino';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as yaml from 'yaml';
-import { writeFileSync } from 'fs';
-import { register as promRegister } from 'prom-client';
+import * as winston from 'winston';
+import { WinstonModule } from 'nest-winston';
 
-async function bootstrap() {``
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  app.useLogger(app.get(Logger));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+// Configure Winston logger for structured JSON logging
+const logger = WinstonModule.createLogger({
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json(),
+        winston.format.printf(({ timestamp, level, message, context, ...meta }) => {
+          return JSON.stringify({
+            timestamp,
+            level,
+            message,
+            context,
+            ...meta,
+          });
+        }),
+      ),
+    }),
+  ],
+});
 
-  app.setGlobalPrefix('api');
-  // URL base: /api/v1/logistic/...
-  app.enableVersioning();
-
-  app.enableCors({
-    origin: (process.env.CORS_ORIGINS ?? '').split(',').filter(Boolean),
-    credentials: true,
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    logger,
   });
 
-  // Swagger
+  // 📖 Swagger setup
   const config = new DocumentBuilder()
-    .setTitle('Logistics Microservice')
-    .setVersion('1.0')
+    .setTitle('Logistic Service API')
+    .setDescription(
+      'API documentation for Logistic Service (Trackings, Pickings, Kanban, Files, Notifications, etc.)'
+    )
+    .setVersion('1.0.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('/docs', app, document);
-  const yamlDoc = yaml.stringify(document as any);
-  writeFileSync('./openapi/openapi.yaml', yamlDoc);
 
-  // Simple /metrics
-  app.getHttpAdapter().get('/metrics', async (_req, res) => {
-    res.setHeader('Content-Type', promRegister.contentType);
-    res.send(await promRegister.metrics());
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
+  // Also serve OpenAPI spec at /openapi/openapi.yaml
+  app.getHttpAdapter().get('/openapi/openapi.yaml', (req, res) => {
+    res.setHeader('Content-Type', 'application/yaml');
+    res.send(document);
   });
 
-  await app.listen(process.env.PORT || 3000);
+  // ✅ ValidationPipe (DTOs safe)
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  // 🌍 Enable CORS
+  const corsOrigins = process.env.CORS_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+  ];
+  app.enableCors({ origin: corsOrigins, credentials: true });
+
+  // 🚀 Start server
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+
+  Logger.log(`🚀 Logistic Service running at: http://localhost:${port}`);
+  Logger.log(`📖 Swagger docs available at: http://localhost:${port}/api/docs`);
+  Logger.log(`📋 OpenAPI spec available at: http://localhost:${port}/openapi/openapi.yaml`);
+  Logger.log(`📊 Prometheus metrics available at: http://localhost:${port}/metrics`);
 }
 bootstrap();

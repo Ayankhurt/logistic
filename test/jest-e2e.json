@@ -6,15 +6,7 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"],
-  "testEnvironmentOptions": {
-    "env": {
-      "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/logistics_test_db",
-      "CONTACTS_BASE_URL": "http://localhost:3001",
-      "CUSTOM_FIELDS_BASE_URL": "http://localhost:3002",
-      "TRAZABILITY_BASE_URL": "http://localhost:3003",
-      "STORAGE_BASE_URL": "http://localhost:3004",
-      "PUBLIC_TRACK_BASE_URL": "https://track.example.com"
-    }
-  }
+  "transformIgnorePatterns": [
+    "/node_modules/(?!uuid)"
+  ]
 }

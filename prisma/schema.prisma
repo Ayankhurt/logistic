@@ -51,7 +51,7 @@ model LogisticRecord {
   carrierId         String?
   messengerId       String?
   state             LogisticState  @default(DRAFT)
-  labels            Json?
+  labels            String?
   extra             Json?
   summary           Json?
   fileUri           String?
@@ -76,9 +76,9 @@ model LogisticRecord {
   @@index([tenantId, state])
   @@index([tenantId, type])
   @@index([messengerId])
-  @@index([labels(ops: jsonb_ops)])
-  @@index([extra(ops: jsonb_ops)])
-  @@index([summary(ops: jsonb_ops)])
+  @@index([labels])
+  @@index([extra])
+  @@index([summary])
 }
 
 model LogisticItem {

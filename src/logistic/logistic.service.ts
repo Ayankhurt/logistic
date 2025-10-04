@@ -58,7 +58,7 @@ export class LogisticService {
           senderContactId: dto.senderContactId,
           recipientContactId: dto.recipientContactId,
           carrierId: dto.carrierId,
-          labels: (dto.labels ?? []).join(','),
+          labels: dto.labels && dto.labels.length > 0 ? dto.labels.join(',') : null,
           extra: dto.extra,
           createdBy: dto.userId,
           items: {
@@ -136,7 +136,7 @@ export class LogisticService {
     const record = await this.prisma.logisticRecord.update({
       where: { id },
       data: {
-        labels: dto.labels?.join(','),
+        labels: dto.labels && dto.labels.length > 0 ? dto.labels.join(',') : null,
         extra: dto.extra as any,
         carrierId: dto.carrierId,
         updatedBy: dto.userId,
@@ -799,10 +799,11 @@ export class LogisticService {
   private mapDbRecordToDomain(db: any): LogisticRecord {
     return {
       ...db,
-      labels:
-        typeof db.labels === 'string' && db.labels.length > 0
+      labels: Array.isArray(db.labels)
+        ? db.labels
+        : (typeof db.labels === 'string' && db.labels.length > 0
           ? db.labels.split(',')
-          : [],
+          : []),
     } as LogisticRecord;
   }
 

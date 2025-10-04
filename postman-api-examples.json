@@ -1,5 +1,77 @@
 {
   "logistic": {
+    "getRecordResponse": {
+      "success": true,
+      "data": {
+        "id": "7a6a4ff5-094f-4fb2-b86c-f8a1bb426ae2",
+        "tenantId": "tenant123",
+        "type": "TRACKING",
+        "guideNumber": "G-1759515583413-V7BR8D8TQ",
+        "originType": "SALE_ORDER",
+        "originId": "origin-uuid-123",
+        "senderContactId": "123e4567-e89b-12d3-a456-426614174000",
+        "recipientContactId": "123e4567-e89b-12d3-a456-426614174001",
+        "carrierId": "carrier123",
+        "messengerId": "messenger-uuid-456",
+        "state": "DRAFT",
+        "labels": [
+          "fragile",
+          "urgent"
+        ],
+        "extra": {
+          "customField1": "value1"
+        },
+        "summary": {
+          "description": "Logistic record for shipment"
+        },
+        "fileUri": "https://example.com/guide.pdf",
+        "parentRecordId": "parent-uuid-789",
+        "createdBy": "user123",
+        "updatedBy": "user456",
+        "createdAt": "2025-10-03T18:19:43.419Z",
+        "updatedAt": "2025-10-03T18:19:43.419Z",
+        "checkStartedAt": "2025-10-03T19:00:00.000Z",
+        "checkFinalizedAt": "2025-10-03T20:00:00.000Z",
+        "checkFinalizedBy": "user789",
+        "items": [
+          {
+            "id": "bc063b83-db76-4963-8a93-6d7686f8afed",
+            "recordId": "7a6a4ff5-094f-4fb2-b86c-f8a1bb426ae2",
+            "originItemId": "item123",
+            "sku": "SKU123",
+            "name": "Item Name",
+            "qtyExpected": 10,
+            "qtyVerified": 10,
+            "selected": true
+          }
+        ],
+        "audit": [
+          {
+            "id": "audit-uuid-001",
+            "tenantId": "tenant123",
+            "recordId": "7a6a4ff5-094f-4fb2-b86c-f8a1bb426ae2",
+            "action": "CREATED",
+            "payload": {
+              "initialState": "DRAFT"
+            },
+            "createdBy": "user123",
+            "createdAt": "2025-10-03T18:19:43.419Z"
+          },
+          {
+            "id": "audit-uuid-002",
+            "tenantId": "tenant123",
+            "recordId": "7a6a4ff5-094f-4fb2-b86c-f8a1bb426ae2",
+            "action": "UPDATED",
+            "payload": {
+              "updatedFields": ["labels"]
+            },
+            "createdBy": "user456",
+            "createdAt": "2025-10-03T18:20:00.000Z"
+          }
+        ],
+        "children": []
+      }
+    },
     "createRecord": {
       "tenantId": "tenant123",
       "type": "TRACKING",
@@ -20,8 +92,7 @@
           "name": "Item Name",
           "qtyExpected": 10
         }
-      ],
-      "userId": "user123"
+      ]
     },
     "updateRecord": {
       "labels": [
@@ -30,16 +101,13 @@
       "extra": {
         "customFieldUpdated": "newValue"
       },
-      "carrierId": "carrier456",
-      "userId": "user456"
+      "carrierId": "carrier456"
     },
     "changeState": {
-      "state": "READY",
-      "userId": "user123"
+      "state": "READY"
     },
     "assignMessenger": {
-      "messengerId": "messenger123",
-      "userId": "user123"
+      "messengerId": "messenger123"
     },
     "verifyItems": {
       "items": [
@@ -48,15 +116,11 @@
           "qtyVerified": 5,
           "selected": true
         }
-      ],
-      "userId": "user123"
+      ]
     },
-    "finalizeCheck": {
-      "userId": "user123"
-    },
+    "finalizeCheck": {},
     "duplicate": {
-      "copyExtraFields": true,
-      "userId": "user123"
+      "copyExtraFields": true
     },
     "split": {
       "items": [
@@ -64,21 +128,13 @@
           "originItemId": "item123",
           "qtyToSplit": 3
         }
-      ],
-      "userId": "user123"
+      ]
     },
     "updateLabels": {
       "labels": [
         "newLabel1",
         "newLabel2"
-      ],
-      "userId": "user123"
-    },
-    "demo": {
-      "message": "Test demo message"
-    },
-    "deleteRecord": {
-      "userId": "user-123"
+      ]
     }
   },
   "kanban": {
@@ -111,12 +167,9 @@
           "selected": true,
           "qtyVerified": 5
         }
-      ],
-      "userId": "user123"
+      ]
     },
-    "finalizeCheck": {
-      "userId": "user123"
-    }
+    "finalizeCheck": {}
   },
   "notify": {
     "testSms": {

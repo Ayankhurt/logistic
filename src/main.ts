@@ -5,6 +5,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as winston from 'winston';
 import { WinstonModule } from 'nest-winston';
 
+// Import modules to include in Swagger
+import { LogisticModule } from './logistic/logistic.module';
+import { FilesModule } from './files/files.module';
+import { NotifyModule } from './notify/notify.module';
+import { KanbanModule } from './kanban/kanban.module';
+import { PublicModule } from './public/public.module';
+
 // Configure Winston logger for structured JSON logging
 const logger = WinstonModule.createLogger({
   transports: [
@@ -42,7 +49,9 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, config, {
+    include: [LogisticModule, FilesModule, NotifyModule, KanbanModule, PublicModule],
+  });
   SwaggerModule.setup('api/docs', app, document);
 
   // Also serve OpenAPI spec at /openapi/openapi.yaml

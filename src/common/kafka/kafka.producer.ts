@@ -9,7 +9,9 @@ export class KafkaProducer implements OnModuleDestroy {
   private producer: Producer;
 
   constructor(private readonly configService: ConfigService) {
-    const brokers = this.configService.get<string>('KAFKA_BROKERS')?.split(',') || ['localhost:9092'];
+    const brokers = this.configService
+      .get<string>('KAFKA_BROKERS')
+      ?.split(',') || ['localhost:9092'];
 
     this.kafka = new Kafka({
       clientId: 'logistic-service',
@@ -29,7 +31,10 @@ export class KafkaProducer implements OnModuleDestroy {
     }
   }
 
-  async send(message: { topic: string; messages: Array<{ key?: string; value: string }> }) {
+  async send(message: {
+    topic: string;
+    messages: Array<{ key?: string; value: string }>;
+  }) {
     try {
       await this.producer.send(message);
       this.logger.log(`Message sent to topic: ${message.topic}`);

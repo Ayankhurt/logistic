@@ -23,7 +23,9 @@ export interface SocketPayload {
 }
 
 @WebSocketGateway({ namespace: '/logistics', cors: { origin: '*' } })
-export class SocketsService implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class SocketsService
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -45,13 +47,17 @@ export class SocketsService implements OnGatewayInit, OnGatewayConnection, OnGat
   @SubscribeMessage('joinTenant')
   handleJoinTenant(client: Socket, tenantId: string): void {
     void client.join(`tenant:${tenantId}`);
-    this.logger.log(`Client ${client.id} joined tenant room: tenant:${tenantId}`);
+    this.logger.log(
+      `Client ${client.id} joined tenant room: tenant:${tenantId}`,
+    );
   }
 
   @SubscribeMessage('joinMessenger')
   handleJoinMessenger(client: Socket, messengerId: string): void {
     void client.join(`messenger:${messengerId}`);
-    this.logger.log(`Client ${client.id} joined messenger room: messenger:${messengerId}`);
+    this.logger.log(
+      `Client ${client.id} joined messenger room: messenger:${messengerId}`,
+    );
   }
 
   @SubscribeMessage('leaveTenant')
@@ -63,7 +69,9 @@ export class SocketsService implements OnGatewayInit, OnGatewayConnection, OnGat
   @SubscribeMessage('leaveMessenger')
   handleLeaveMessenger(client: Socket, messengerId: string): void {
     void client.leave(`messenger:${messengerId}`);
-    this.logger.log(`Client ${client.id} left messenger room: messenger:${messengerId}`);
+    this.logger.log(
+      `Client ${client.id} left messenger room: messenger:${messengerId}`,
+    );
   }
 
   // --- Emit events to tenant room ---

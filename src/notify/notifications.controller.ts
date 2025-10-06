@@ -17,13 +17,31 @@ export class NotificationsController {
     if (channel === NotificationChannel.SMS) {
       await this.notifyService.sendTrackingNotification(
         dto.recipient,
-        dto.guideNumber,
+        {
+          guideNumber: dto.guideNumber,
+          type: dto.type,
+          senderContactId: dto.senderContactId,
+          recipientContactId: dto.recipientContactId,
+          carrierId: dto.carrierId,
+          labels: dto.labels,
+          items: dto.items,
+          tenantId: dto.tenantId,
+        },
         dto.link,
       );
     } else if (channel === NotificationChannel.WHATSAPP) {
       await this.notifyService.sendWhatsAppTracking(
         dto.recipient,
-        dto.guideNumber,
+        {
+          guideNumber: dto.guideNumber,
+          type: dto.type,
+          senderContactId: dto.senderContactId,
+          recipientContactId: dto.recipientContactId,
+          carrierId: dto.carrierId,
+          labels: dto.labels,
+          items: dto.items,
+          tenantId: dto.tenantId,
+        },
         dto.link,
       );
     }

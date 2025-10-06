@@ -14,7 +14,8 @@ export class MockAuthService {
   async verifyToken(token: string): Promise<boolean> {
     // For local development, always return true
     // In production, this should call the real auth service
-    const isDevelopment = this.configService.get<string>('NODE_ENV') === 'development';
+    const isDevelopment =
+      this.configService.get<string>('NODE_ENV') === 'development';
 
     if (isDevelopment) {
       this.logger.log('Mock auth: Token verification bypassed in development');
@@ -22,18 +23,22 @@ export class MockAuthService {
     }
 
     // In production, use the real auth service
-    const authServiceUrl = this.configService.get<string>('AUTH_BASE_URL') || 'https://apis.gestoru.com';
+    const authServiceUrl =
+      this.configService.get<string>('AUTH_BASE_URL') ||
+      'https://apis.gestoru.com';
 
     try {
-      const response = await this.httpService.post(
-        `${authServiceUrl}/auth/v1/verify-token`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
+      const response = await this.httpService
+        .post(
+          `${authServiceUrl}/auth/v1/verify-token`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        },
-      ).toPromise();
+        )
+        .toPromise();
 
       return response?.data?.valid === true;
     } catch (error) {

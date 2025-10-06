@@ -3,32 +3,39 @@ import { ConfigService } from '@nestjs/config';
 import { Twilio } from 'twilio';
 
 @Injectable()
-  export class NotificationsService {
-    private readonly logger = new Logger(NotificationsService.name);
-    private twilioClient: Twilio | null = null;
-    private fromNumber: string | null = null;
-    private isTwilioConfigured = false;
+export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+  private twilioClient: Twilio | null = null;
+  private fromNumber: string | null = null;
+  private isTwilioConfigured = false;
 
-    constructor(private configService: ConfigService) {
-      const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
-      const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
-      this.fromNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER') || null;
+  constructor(private configService: ConfigService) {
+    const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
+    const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
+    this.fromNumber =
+      this.configService.get<string>('TWILIO_PHONE_NUMBER') || null;
 
-      if (accountSid && authToken && this.fromNumber &&
-          accountSid !== 'your-twilio-account-sid' &&
-          authToken !== 'your-twilio-auth-token' &&
-          !this.fromNumber.includes('1234567890')) {
-        try {
-          this.twilioClient = new Twilio(accountSid, authToken);
-          this.isTwilioConfigured = true;
-          this.logger.log('✅ Twilio client initialized successfully');
-        } catch (error) {
-          this.logger.error('❌ Failed to initialize Twilio client:', error);
-        }
-      } else {
-        this.logger.warn('⚠️ Twilio credentials not configured. SMS and WhatsApp features will be disabled.');
+    if (
+      accountSid &&
+      authToken &&
+      this.fromNumber &&
+      accountSid !== 'your-twilio-account-sid' &&
+      authToken !== 'your-twilio-auth-token' &&
+      !this.fromNumber.includes('1234567890')
+    ) {
+      try {
+        this.twilioClient = new Twilio(accountSid, authToken);
+        this.isTwilioConfigured = true;
+        this.logger.log('✅ Twilio client initialized successfully');
+      } catch (error) {
+        this.logger.error('❌ Failed to initialize Twilio client:', error);
       }
+    } else {
+      this.logger.warn(
+        '⚠️ Twilio credentials not configured. SMS and WhatsApp features will be disabled.',
+      );
     }
+  }
 
   private isValidPhoneNumber(phoneNumber: string): boolean {
     // Basic phone number validation - should start with + and contain only digits
@@ -38,7 +45,9 @@ import { Twilio } from 'twilio';
 
   async sendSms(to: string, body: string): Promise<void> {
     if (!this.isTwilioConfigured || !this.twilioClient) {
-      this.logger.warn(`📱 SMS not sent to ${to}: Twilio not configured`);
+      this.logger.warn(
+        `📱 SMS not sent to ${to}: Twilio not configured (development mode)`,
+      );
       return;
     }
 
@@ -66,8 +75,23 @@ import { Twilio } from 'twilio';
           `SMS not enabled for region ${to}. Please check Twilio console settings.`,
         );
       } else if (err.code === 21211) {
-        this.logger.error(`❌ Invalid 'To' phone number: ${to}`);
-        throw new Error(`Invalid phone number: ${to}`);
+        // In development, provide helpful message for invalid phone numbers
+        const isDevelopment =
+          this.configService.get<string>('NODE_ENV') !== 'production';
+        if (isDevelopment) {
+          this.logger.warn(
+            `⚠️ Phone number ${to} is not valid for Twilio. In development, use a verified phone number or set up Twilio test credentials.`,
+          );
+          this.logger.warn(
+            `💡 For testing, you can use Twilio's test phone numbers or verified numbers from your account.`,
+          );
+          throw new Error(
+            `Invalid phone number for testing: ${to}. Use a verified phone number or set up Twilio test credentials.`,
+          );
+        } else {
+          this.logger.error(`❌ Invalid 'To' phone number: ${to}`);
+          throw new Error(`Invalid phone number: ${to}`);
+        }
       } else if (err.code === 21214) {
         this.logger.error(`❌ Invalid 'From' phone number: ${this.fromNumber}`);
         throw new Error(`Invalid Twilio phone number configuration`);
@@ -82,7 +106,9 @@ import { Twilio } from 'twilio';
 
   async sendWhatsApp(to: string, body: string): Promise<void> {
     if (!this.isTwilioConfigured || !this.twilioClient) {
-      this.logger.warn(`📱 WhatsApp message not sent to ${to}: Twilio not configured`);
+      this.logger.warn(
+        `📱 WhatsApp message not sent to ${to}: Twilio not configured (development mode)`,
+      );
       return;
     }
 
@@ -110,8 +136,23 @@ import { Twilio } from 'twilio';
           `WhatsApp channel not configured. Please set up WhatsApp Sandbox in Twilio console.`,
         );
       } else if (err.code === 21211) {
-        this.logger.error(`❌ Invalid 'To' phone number: ${to}`);
-        throw new Error(`Invalid phone number: ${to}`);
+        // In development, provide helpful message for invalid phone numbers
+        const isDevelopment =
+          this.configService.get<string>('NODE_ENV') !== 'production';
+        if (isDevelopment) {
+          this.logger.warn(
+            `⚠️ Phone number ${to} is not valid for Twilio. In development, use a verified phone number or set up Twilio test credentials.`,
+          );
+          this.logger.warn(
+            `💡 For testing, you can use Twilio's test phone numbers or verified numbers from your account.`,
+          );
+          throw new Error(
+            `Invalid phone number for testing: ${to}. Use a verified phone number or set up Twilio test credentials.`,
+          );
+        } else {
+          this.logger.error(`❌ Invalid 'To' phone number: ${to}`);
+          throw new Error(`Invalid phone number: ${to}`);
+        }
       } else if (err.code === 21214) {
         this.logger.error(`❌ Invalid 'From' phone number: ${this.fromNumber}`);
         throw new Error(`Invalid Twilio phone number configuration`);

@@ -62,7 +62,8 @@ export class StorageService {
       formData.append('uuid', this.uuid);
       formData.append('module_id', this.moduleId);
 
-      const url = `${this.baseUrl}/files/create/multiple`;
+      // Use storage.gestoru.com for multiple file uploads as per requirement
+      const url = `https://storage.gestoru.com/files/create/multiple`;
       const response = await firstValueFrom(
         this.httpService.post(url, formData, {
           headers: {
@@ -74,9 +75,10 @@ export class StorageService {
         }),
       );
 
-      const data = response.data as { urls: string[] };
+      // Response returns an array with the files
+      const data = response.data as Array<{ url: string }>;
       this.logger.log(`Uploaded ${files.length} files`);
-      return data.urls.map((url: string) => ({ url }));
+      return data;
     } catch (error) {
       this.logger.error(
         `Error uploading multiple files: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -88,7 +90,15 @@ export class StorageService {
   /**
    * Get list of files
    */
-  async getFiles(tenantId?: string): Promise<Array<{ id: string; name: string; url: string; size?: number; createdAt?: string }>> {
+  async getFiles(tenantId?: string): Promise<
+    Array<{
+      id: string;
+      name: string;
+      url: string;
+      size?: number;
+      createdAt?: string;
+    }>
+  > {
     try {
       const url = `${this.baseUrl}/files/list`;
       const response = await firstValueFrom(
@@ -100,7 +110,13 @@ export class StorageService {
         }),
       );
 
-      const files = response.data as Array<{ id: string; name: string; url: string; size?: number; createdAt?: string }>;
+      const files = response.data as Array<{
+        id: string;
+        name: string;
+        url: string;
+        size?: number;
+        createdAt?: string;
+      }>;
       this.logger.log(`Fetched ${files.length} files`);
       return files;
     } catch (error) {
@@ -114,7 +130,16 @@ export class StorageService {
   /**
    * Get single file by ID
    */
-  async getFile(id: string, tenantId?: string): Promise<{ id: string; name: string; url: string; size?: number; createdAt?: string }> {
+  async getFile(
+    id: string,
+    tenantId?: string,
+  ): Promise<{
+    id: string;
+    name: string;
+    url: string;
+    size?: number;
+    createdAt?: string;
+  }> {
     try {
       const url = `${this.baseUrl}/files/${id}`;
       const response = await firstValueFrom(
@@ -126,7 +151,13 @@ export class StorageService {
         }),
       );
 
-      const file = response.data as { id: string; name: string; url: string; size?: number; createdAt?: string };
+      const file = response.data as {
+        id: string;
+        name: string;
+        url: string;
+        size?: number;
+        createdAt?: string;
+      };
       this.logger.log(`Fetched file: ${file.name}`);
       return file;
     } catch (error) {

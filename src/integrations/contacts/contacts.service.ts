@@ -22,12 +22,17 @@ export class ContactsService {
   async listContacts(tenantId: string): Promise<Contact[]> {
     try {
       // Check if AUTH_TOKEN is configured
-      if (!process.env.AUTH_TOKEN || process.env.AUTH_TOKEN === 'your-gestoru-auth-token-here') {
-        this.logger.warn('AUTH_TOKEN not configured, returning mock data for development');
+      if (
+        !process.env.AUTH_TOKEN ||
+        process.env.AUTH_TOKEN === 'your-gestoru-auth-token-here'
+      ) {
+        this.logger.warn(
+          'AUTH_TOKEN not configured, returning mock data for development',
+        );
         return this.getMockContacts(tenantId);
       }
 
-      const url = `${this.baseUrl}/contacts/v1/list`;
+      const url = `${this.baseUrl}/api/contacts/list`;
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: {
@@ -43,7 +48,9 @@ export class ContactsService {
       );
       return contacts;
     } catch (error) {
-      this.logger.warn(`External contacts service failed, falling back to mock data: ${error.message}`);
+      this.logger.warn(
+        `External contacts service failed, falling back to mock data: ${error.message}`,
+      );
       return this.getMockContacts(tenantId);
     }
   }
@@ -79,13 +86,18 @@ export class ContactsService {
   async validateContact(contactId: string, tenantId: string): Promise<boolean> {
     try {
       // Check if AUTH_TOKEN is configured
-      if (!process.env.AUTH_TOKEN || process.env.AUTH_TOKEN === 'your-gestoru-auth-token-here') {
-        this.logger.warn('AUTH_TOKEN not configured, using mock validation for development');
+      if (
+        !process.env.AUTH_TOKEN ||
+        process.env.AUTH_TOKEN === 'your-gestoru-auth-token-here'
+      ) {
+        this.logger.warn(
+          'AUTH_TOKEN not configured, using mock validation for development',
+        );
         return this.validateContactMock(contactId, tenantId);
       }
 
       // Use direct validation API instead of fetching all contacts
-      const url = `${this.baseUrl}/contacts/v1/validate/${contactId}`;
+      const url = `${this.baseUrl}/api/contacts/validate/${contactId}`;
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: {
@@ -100,7 +112,9 @@ export class ContactsService {
       return isValid;
     } catch (error) {
       // Fallback to old method if new endpoint doesn't exist
-      this.logger.warn(`Direct validation failed, falling back to mock method: ${error.message}`);
+      this.logger.warn(
+        `Direct validation failed, falling back to mock method: ${error.message}`,
+      );
       return this.validateContactMock(contactId, tenantId);
     }
   }
@@ -120,7 +134,10 @@ export class ContactsService {
    * @param contactId Contact ID
    * @param tenantId Tenant ID
    */
-  private async validateContactFallback(contactId: string, tenantId: string): Promise<boolean> {
+  private async validateContactFallback(
+    contactId: string,
+    tenantId: string,
+  ): Promise<boolean> {
     try {
       const contacts = await this.listContacts(tenantId);
       const exists = contacts.some((contact) => contact.id === contactId);

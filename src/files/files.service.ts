@@ -14,7 +14,10 @@ export class FilesService {
 
     try {
       // Upload file to storage service
-      const result = await this.storageService.uploadFile(file.buffer, file.originalname);
+      const result = await this.storageService.uploadFile(
+        file.buffer,
+        file.originalname,
+      );
 
       this.logger.log(`File uploaded successfully: ${file.originalname}`);
 

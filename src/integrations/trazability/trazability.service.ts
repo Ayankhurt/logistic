@@ -9,14 +9,26 @@ export class TrazabilityService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  async createEvent(payload: Record<string, unknown>): Promise<{
+  async createEvent(payload: {
+    action: string;
+    entity: string;
+    entityId: string;
+    tenantId: string;
+    userId: string;
+    data: Record<string, unknown>;
+  }): Promise<{
     status: string;
     payload: Record<string, unknown>;
   }> {
     try {
       // Check if AUTH_TOKEN is configured
-      if (!process.env.AUTH_TOKEN || process.env.AUTH_TOKEN === 'your-gestoru-auth-token-here') {
-        this.logger.warn('AUTH_TOKEN not configured, using mock trazability for development');
+      if (
+        !process.env.AUTH_TOKEN ||
+        process.env.AUTH_TOKEN === 'your-gestoru-auth-token-here'
+      ) {
+        this.logger.warn(
+          'AUTH_TOKEN not configured, using mock trazability for development',
+        );
         return this.createMockEvent(payload);
       }
 
@@ -33,7 +45,9 @@ export class TrazabilityService {
       this.logger.log(`Trazability event created: ${JSON.stringify(payload)}`);
       return { status: 'success', payload: response.data };
     } catch (error) {
-      this.logger.warn(`External trazability service failed, falling back to mock: ${error.message}`);
+      this.logger.warn(
+        `External trazability service failed, falling back to mock: ${error.message}`,
+      );
       return this.createMockEvent(payload);
     }
   }
@@ -45,7 +59,9 @@ export class TrazabilityService {
     status: string;
     payload: Record<string, unknown>;
   } {
-    this.logger.log(`Mock trazability event created: ${JSON.stringify(payload)}`);
+    this.logger.log(
+      `Mock trazability event created: ${JSON.stringify(payload)}`,
+    );
 
     // Return a mock successful response
     return {
@@ -54,8 +70,8 @@ export class TrazabilityService {
         ...payload,
         mockEventId: `mock-event-${Date.now()}`,
         createdAt: new Date().toISOString(),
-        status: 'CREATED'
-      }
+        status: 'CREATED',
+      },
     };
   }
 }

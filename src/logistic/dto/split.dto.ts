@@ -1,4 +1,11 @@
-import { IsArray, IsString, IsInt, Min, IsOptional, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsString,
+  IsInt,
+  Min,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -14,7 +21,10 @@ export class SplitItemDto {
 }
 
 export class SplitDto {
-  @ApiProperty({ description: 'Items and quantities for this split', type: [SplitItemDto] })
+  @ApiProperty({
+    description: 'Items and quantities for this split',
+    type: [SplitItemDto],
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SplitItemDto)

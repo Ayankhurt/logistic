@@ -26,13 +26,13 @@ export class PublicService {
       state: record.state,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      items: record.items.map(item => ({
+      items: record.items.map((item) => ({
         name: item.name,
         sku: item.sku,
         qtyExpected: item.qtyExpected,
         qtyVerified: item.qtyVerified,
       })),
-      recentEvents: record.audit.map(audit => ({
+      recentEvents: record.audit.map((audit) => ({
         action: audit.action,
         createdAt: audit.createdAt,
         createdBy: audit.createdBy,

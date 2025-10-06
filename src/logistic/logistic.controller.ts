@@ -41,7 +41,9 @@ export class LogisticController {
   }
 
   @Post()
-  async create(@Body() dto: CreateLogisticRecordDto): Promise<{ success: boolean; data: LogisticRecord }> {
+  async create(
+    @Body() dto: CreateLogisticRecordDto,
+  ): Promise<{ success: boolean; data: LogisticRecord }> {
     const record = await this.logisticService.createRecord(dto);
     return { success: true, data: record };
   }

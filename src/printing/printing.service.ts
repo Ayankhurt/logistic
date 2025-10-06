@@ -70,7 +70,12 @@ export class PrintingService {
   }
 
   private async generateHTMLContent(recordData: any): Promise<string> {
-    const { guideNumber, senderContactId, recipientContactId, items = [] } = recordData;
+    const {
+      guideNumber,
+      senderContactId,
+      recipientContactId,
+      items = [],
+    } = recordData;
 
     // Generate Code 128 barcode HTML (simplified, in real implementation use a library)
     const barcodeHTML = await this.generateBarcodeHTML(guideNumber);
@@ -119,13 +124,17 @@ export class PrintingService {
                 </tr>
               </thead>
               <tbody>
-                ${items.map((item: any) => `
+                ${items
+                  .map(
+                    (item: any) => `
                   <tr>
                     <td>${item.sku || ''}</td>
                     <td>${item.name || ''}</td>
                     <td>${item.qtyExpected || 0}</td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join('')}
               </tbody>
             </table>
           </div>
@@ -158,5 +167,153 @@ export class PrintingService {
         </div>
       `;
     }
+  }
+
+  async printSelectedFiles(
+    fileIds: string[],
+    tenantId?: string,
+  ): Promise<string> {
+    this.logger.log(`Generating PDF for selected files: ${fileIds.join(', ')}`);
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      timeout: 60000, // Increase timeout to 60 seconds
+    });
+
+    try {
+      const page = await browser.newPage();
+
+      // Generate HTML content for the PDF with selected files
+      const htmlContent = await this.generateFilesHTMLContent(
+        fileIds,
+        tenantId,
+      );
+
+      await page.setContent(htmlContent, {
+        waitUntil: 'networkidle0',
+        timeout: 60000,
+      });
+
+      // Generate PDF buffer
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px',
+        },
+      });
+
+      // Upload PDF to storage
+      const uploadResult = await this.storageService.uploadFile(
+        Buffer.from(pdfBuffer),
+        `selected-files-${Date.now()}.pdf`,
+      );
+
+      this.logger.log(`PDF generated and uploaded for selected files`);
+      return uploadResult.url;
+    } catch (error) {
+      this.logger.error(
+        `Error generating PDF for selected files: ${error.message}`,
+      );
+      throw error;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async generateFilesHTMLContent(
+    fileIds: string[],
+    tenantId?: string,
+  ): Promise<string> {
+    const files: any[] = [];
+
+    for (const fileId of fileIds) {
+      let file: {
+        id: string;
+        name: string;
+        url: string;
+        size?: number;
+        createdAt?: string;
+      } | null = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          file = await this.storageService.getFile(fileId, tenantId);
+          break; // Success, exit retry loop
+        } catch (error) {
+          attempts++;
+          this.logger.warn(
+            `Attempt ${attempts} - Could not fetch file ${fileId}: ${error.message}`,
+          );
+          if (attempts >= maxAttempts) {
+            this.logger.error(
+              `Failed to fetch file ${fileId} after ${maxAttempts} attempts`,
+            );
+          } else {
+            // Wait before retrying
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * attempts),
+            );
+          }
+        }
+      }
+      if (file) {
+        files.push(file);
+      }
+    }
+
+    const filesHTML = files
+      .map((file: any) => {
+        const isImage = file.mimetype?.startsWith('image/');
+        if (isImage) {
+          return `
+          <div class="file-item">
+            <h4>${file.name || file.filename || 'Unnamed File'}</h4>
+            <img src="${file.url}" alt="${file.name}" style="max-width: 100%; height: auto;" />
+          </div>
+        `;
+        } else {
+          return `
+          <div class="file-item">
+            <h4>${file.name || file.filename || 'Unnamed File'}</h4>
+            <p><strong>Type:</strong> ${file.mimetype || 'Unknown'}</p>
+            <p><strong>Size:</strong> ${file.size ? `${(file.size / 1024).toFixed(2)} KB` : 'Unknown'}</p>
+            <p><a href="${file.url}" target="_blank">Download File</a></p>
+          </div>
+        `;
+        }
+      })
+      .join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Selected Files Printout</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .file-item { margin: 20px 0; padding: 10px; border: 1px solid #ddd; }
+            .file-item img { max-width: 100%; height: auto; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Selected Files Printout</h1>
+            <p>Generated on ${new Date().toLocaleString()}</p>
+          </div>
+
+          <div class="files">
+            ${filesHTML}
+          </div>
+        </body>
+      </html>
+    `;
   }
 }

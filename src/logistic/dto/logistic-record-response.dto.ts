@@ -1,5 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { LogisticType, LogisticState } from '../interfaces/logistic.interface';
+import type {
+  LogisticType,
+  LogisticState,
+} from '../interfaces/logistic.interface';
 
 export class LogisticItemResponseDto {
   @ApiProperty({ description: 'Item ID' })
@@ -81,7 +84,19 @@ export class LogisticRecordResponseDto {
   @ApiPropertyOptional({ description: 'Assigned messenger ID' })
   messengerId?: string;
 
-  @ApiProperty({ description: 'Current state', enum: ['DRAFT', 'CHECK_PENDING', 'CHECK_IN_PROGRESS', 'CHECK_FINALIZED', 'READY', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'] })
+  @ApiProperty({
+    description: 'Current state',
+    enum: [
+      'DRAFT',
+      'CHECK_PENDING',
+      'CHECK_IN_PROGRESS',
+      'CHECK_FINALIZED',
+      'READY',
+      'IN_TRANSIT',
+      'DELIVERED',
+      'CANCELLED',
+    ],
+  })
   state: LogisticState;
 
   @ApiProperty({ description: 'Labels', type: [String] })
@@ -99,10 +114,16 @@ export class LogisticRecordResponseDto {
   @ApiPropertyOptional({ description: 'Parent record ID' })
   parentRecordId?: string;
 
-  @ApiPropertyOptional({ description: 'Child records', type: [LogisticRecordResponseDto] })
+  @ApiPropertyOptional({
+    description: 'Child records',
+    type: [LogisticRecordResponseDto],
+  })
   children?: LogisticRecordResponseDto[];
 
-  @ApiProperty({ description: 'Items in this record', type: [LogisticItemResponseDto] })
+  @ApiProperty({
+    description: 'Items in this record',
+    type: [LogisticItemResponseDto],
+  })
   items: LogisticItemResponseDto[];
 
   @ApiProperty({ description: 'Audit logs', type: [AuditLogResponseDto] })

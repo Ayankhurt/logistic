@@ -8,12 +8,13 @@ export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Health check endpoint',
-    description: 'Returns the health status of the application and its dependencies'
+    description:
+      'Returns the health status of the application and its dependencies',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Service is healthy',
     schema: {
       type: 'object',
@@ -22,12 +23,12 @@ export class HealthController {
         timestamp: { type: 'string', format: 'date-time' },
         uptime: { type: 'number', example: 123.456 },
         database: { type: 'string', example: 'connected' },
-        version: { type: 'string', example: '1.0.0' }
-      }
-    }
+        version: { type: 'string', example: '1.0.0' },
+      },
+    },
   })
-  @ApiResponse({ 
-    status: 503, 
+  @ApiResponse({
+    status: 503,
     description: 'Service is unhealthy',
     schema: {
       type: 'object',
@@ -37,9 +38,9 @@ export class HealthController {
         uptime: { type: 'number', example: 123.456 },
         database: { type: 'string', example: 'disconnected' },
         version: { type: 'string', example: '1.0.0' },
-        error: { type: 'string', example: 'Database connection failed' }
-      }
-    }
+        error: { type: 'string', example: 'Database connection failed' },
+      },
+    },
   })
   async check() {
     const startTime = Date.now();
@@ -68,30 +69,30 @@ export class HealthController {
   }
 
   @Get('ready')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Readiness check endpoint',
-    description: 'Returns whether the service is ready to accept traffic'
+    description: 'Returns whether the service is ready to accept traffic',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Service is ready',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'ready' },
-        timestamp: { type: 'string', format: 'date-time' }
-      }
-    }
+        timestamp: { type: 'string', format: 'date-time' },
+      },
+    },
   })
-  @ApiResponse({ 
-    status: 503, 
-    description: 'Service is not ready'
+  @ApiResponse({
+    status: 503,
+    description: 'Service is not ready',
   })
   async ready() {
     try {
       // Check if database is accessible
       await this.prisma.$queryRaw`SELECT 1`;
-      
+
       return {
         status: 'ready',
         timestamp: new Date().toISOString(),
@@ -102,21 +103,21 @@ export class HealthController {
   }
 
   @Get('live')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Liveness check endpoint',
-    description: 'Returns whether the service is alive (basic process check)'
+    description: 'Returns whether the service is alive (basic process check)',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Service is alive',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'alive' },
         timestamp: { type: 'string', format: 'date-time' },
-        uptime: { type: 'number', example: 123.456 }
-      }
-    }
+        uptime: { type: 'number', example: 123.456 },
+      },
+    },
   })
   async live() {
     return {

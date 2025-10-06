@@ -11,6 +11,7 @@ import { FilesModule } from './files/files.module';
 import { NotifyModule } from './notify/notify.module';
 import { KanbanModule } from './kanban/kanban.module';
 import { PublicModule } from './public/public.module';
+import { PrintingModule } from './printing/printing.module';
 
 // Configure Winston logger for structured JSON logging
 const logger = WinstonModule.createLogger({
@@ -20,15 +21,17 @@ const logger = WinstonModule.createLogger({
         winston.format.timestamp(),
         winston.format.errors({ stack: true }),
         winston.format.json(),
-        winston.format.printf(({ timestamp, level, message, context, ...meta }) => {
-          return JSON.stringify({
-            timestamp,
-            level,
-            message,
-            context,
-            ...meta,
-          });
-        }),
+        winston.format.printf(
+          ({ timestamp, level, message, context, ...meta }) => {
+            return JSON.stringify({
+              timestamp,
+              level,
+              message,
+              context,
+              ...meta,
+            });
+          },
+        ),
       ),
     }),
   ],
@@ -43,14 +46,21 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Logistic Service API')
     .setDescription(
-      'API documentation for Logistic Service (Trackings, Pickings, Kanban, Files, Notifications, etc.)'
+      'API documentation for Logistic Service (Trackings, Pickings, Kanban, Files, Notifications, etc.)',
     )
     .setVersion('1.0.0')
     .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
-    include: [LogisticModule, FilesModule, NotifyModule, KanbanModule, PublicModule],
+    include: [
+      LogisticModule,
+      FilesModule,
+      NotifyModule,
+      KanbanModule,
+      PublicModule,
+      PrintingModule,
+    ],
   });
   SwaggerModule.setup('api/docs', app, document);
 
@@ -81,7 +91,11 @@ async function bootstrap() {
 
   Logger.log(`🚀 Logistic Service running at: http://localhost:${port}`);
   Logger.log(`📖 Swagger docs available at: http://localhost:${port}/api/docs`);
-  Logger.log(`📋 OpenAPI spec available at: http://localhost:${port}/openapi/openapi.yaml`);
-  Logger.log(`📊 Prometheus metrics available at: http://localhost:${port}/metrics`);
+  Logger.log(
+    `📋 OpenAPI spec available at: http://localhost:${port}/openapi/openapi.yaml`,
+  );
+  Logger.log(
+    `📊 Prometheus metrics available at: http://localhost:${port}/metrics`,
+  );
 }
 bootstrap();

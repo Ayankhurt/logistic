@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsString, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum NotificationChannel {
@@ -34,4 +34,32 @@ export class NotifyDto {
   })
   @IsString()
   link: string;
+
+  @ApiProperty({ description: 'Type of logistic record' })
+  @IsString()
+  type: string;
+
+  @ApiProperty({ description: 'Sender contact ID' })
+  @IsUUID()
+  senderContactId: string;
+
+  @ApiProperty({ description: 'Recipient contact ID' })
+  @IsUUID()
+  recipientContactId: string;
+
+  @ApiProperty({ description: 'Carrier ID', required: false })
+  @IsString()
+  carrierId?: string;
+
+  @ApiProperty({ description: 'Labels', type: [String], required: false })
+  @IsArray()
+  labels?: string[];
+
+  @ApiProperty({ description: 'Items', type: [Object] })
+  @IsArray()
+  items: Array<{ name: string | null; qtyExpected: number }>;
+
+  @ApiProperty({ description: 'Tenant ID' })
+  @IsString()
+  tenantId: string;
 }
